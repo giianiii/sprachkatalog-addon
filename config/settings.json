@@ -32,23 +32,154 @@
     "oldTitleDays": 365
   },
   "rows": [
-    { "id": "trending-movie", "type": "movie", "name": "Gerade angesagt", "source": { "path": "/trending/movie/week" } },
-
-    { "id": "netflix-movie", "type": "movie", "name": "Netflix", "source": { "discover": true, "providers": "8" } },
-    { "id": "netflix-series", "type": "series", "name": "Netflix", "source": { "discover": true, "providers": "8" } },
-    { "id": "hbomax-movie", "type": "movie", "name": "HBO Max", "source": { "discover": true, "providers": "1899" } },
-    { "id": "hbomax-series", "type": "series", "name": "HBO Max", "source": { "discover": true, "providers": "1899" } },
-    { "id": "disney-movie", "type": "movie", "name": "Disney+", "source": { "discover": true, "providers": "337" } },
-    { "id": "disney-series", "type": "series", "name": "Disney+", "source": { "discover": true, "providers": "337" } },
-    { "id": "appletv-movie", "type": "movie", "name": "Apple TV+", "source": { "discover": true, "providers": "350" } },
-    { "id": "appletv-series", "type": "series", "name": "Apple TV+", "source": { "discover": true, "providers": "350" } },
-    { "id": "prime-movie", "type": "movie", "name": "Prime Video", "source": { "discover": true, "providers": "119" } },
-    { "id": "prime-series", "type": "series", "name": "Prime Video", "source": { "discover": true, "providers": "119" } },
-
-    { "id": "popular-movie", "type": "movie", "name": "Beliebt", "source": { "path": "/movie/popular" } },
-    { "id": "popular-series", "type": "series", "name": "Beliebt", "source": { "path": "/tv/popular" } },
-    { "id": "toprated-movie", "type": "movie", "name": "Top bewertet", "source": { "path": "/movie/top_rated" } },
-    { "id": "toprated-series", "type": "series", "name": "Top bewertet", "source": { "path": "/tv/top_rated" } }
+    {
+      "id": "trending-movie",
+      "type": "movie",
+      "name": "Gerade angesagt",
+      "source": {
+        "path": "/trending/movie/week",
+        "aiometadata": "Gerade angesagt"
+      }
+    },
+    {
+      "id": "netflix-movie",
+      "type": "movie",
+      "name": "Netflix",
+      "source": {
+        "discover": true,
+        "providers": "8",
+        "aiometadata": "Netflix"
+      }
+    },
+    {
+      "id": "netflix-series",
+      "type": "series",
+      "name": "Netflix",
+      "source": {
+        "discover": true,
+        "providers": "8",
+        "aiometadata": "Netflix"
+      }
+    },
+    {
+      "id": "hbomax-movie",
+      "type": "movie",
+      "name": "HBO Max",
+      "source": {
+        "discover": true,
+        "providers": "1899",
+        "aiometadata": "HBO Max"
+      }
+    },
+    {
+      "id": "hbomax-series",
+      "type": "series",
+      "name": "HBO Max",
+      "source": {
+        "discover": true,
+        "providers": "1899",
+        "aiometadata": "HBO Max"
+      }
+    },
+    {
+      "id": "disney-movie",
+      "type": "movie",
+      "name": "Disney+",
+      "source": {
+        "discover": true,
+        "providers": "337",
+        "aiometadata": "Disney+"
+      }
+    },
+    {
+      "id": "disney-series",
+      "type": "series",
+      "name": "Disney+",
+      "source": {
+        "discover": true,
+        "providers": "337",
+        "aiometadata": "Disney+"
+      }
+    },
+    {
+      "id": "appletv-movie",
+      "type": "movie",
+      "name": "Apple TV+",
+      "source": {
+        "discover": true,
+        "providers": "350",
+        "aiometadata": "Apple TV+"
+      }
+    },
+    {
+      "id": "appletv-series",
+      "type": "series",
+      "name": "Apple TV+",
+      "source": {
+        "discover": true,
+        "providers": "350",
+        "aiometadata": "Apple TV+"
+      }
+    },
+    {
+      "id": "prime-movie",
+      "type": "movie",
+      "name": "Prime Video",
+      "source": {
+        "discover": true,
+        "providers": "119",
+        "aiometadata": "Prime Video"
+      }
+    },
+    {
+      "id": "prime-series",
+      "type": "series",
+      "name": "Prime Video",
+      "source": {
+        "discover": true,
+        "providers": "119",
+        "aiometadata": "Prime Video"
+      }
+    },
+    {
+      "id": "popular-movie",
+      "type": "movie",
+      "name": "Beliebt",
+      "source": {
+        "path": "/movie/popular",
+        "aiometadata": "Beliebt"
+      }
+    },
+    {
+      "id": "popular-series",
+      "type": "series",
+      "name": "Beliebt",
+      "source": {
+        "path": "/tv/popular",
+        "aiometadata": "Beliebt"
+      }
+    },
+    {
+      "id": "toprated-movie",
+      "type": "movie",
+      "name": "Top bewertet",
+      "source": {
+        "path": "/movie/top_rated",
+        "aiometadata": "Top bewertet"
+      }
+    },
+    {
+      "id": "toprated-series",
+      "type": "series",
+      "name": "Top bewertet",
+      "source": {
+        "path": "/tv/top_rated",
+        "aiometadata": "Top bewertet"
+      }
+    }
   ],
-  "pagesPerRow": 3
+  "pagesPerRow": 3,
+  "_quelle": "Reihen kommen aus deinem AIOMetadata (Name der Reihe unter source.aiometadata). Ohne AIOMETADATA_URL wird auf TMDB (path/discover) zurückgegriffen.",
+  "itemsPerRow": 60,
+  "rowRefreshHours": 6
 }

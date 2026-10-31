@@ -40,6 +40,7 @@ jobs:
         env:
           TMDB_KEY: ${{ secrets.TMDB_KEY }}
           AIOSTREAMS_URL: ${{ secrets.AIOSTREAMS_URL }}
+          AIOMETADATA_URL: ${{ secrets.AIOMETADATA_URL }}
           PAGES_URL: ${{ steps.pages.outputs.base_url }}
           CHECK_ALL: ${{ inputs.alles && 'true' || 'false' }}
         run: node scripts/build.mjs

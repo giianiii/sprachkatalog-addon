@@ -6,7 +6,8 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
 
 ## So funktioniert es
 
-1. Jede Stunde holt ein GitHub-Actions-Job die Reihen von TMDB (Region CH).
+1. Jede Stunde läuft ein GitHub-Actions-Job. Die Reihen holt er alle 6 Stunden aus deinem
+   AIOMetadata (dieselben Listen wie auf deiner Startseite); ohne AIOMetadata direkt von TMDB (Region CH).
 2. Für jeden Titel fragt er die eigene AIOStreams-Konfiguration ab, ob ein gecachter
    Stream mit deutscher Tonspur existiert (Serien: Stichprobe S01E01).
 3. Ergebnisse werden zwischengespeichert: bestätigte Titel werden alle 30 Tage erneut
@@ -21,6 +22,9 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
    - `TMDB_KEY`: TMDB-API-Key (v3) oder Lese-Token (v4)
    - `AIOSTREAMS_URL`: die AIOStreams-Manifest-URL (endet auf `/manifest.json`).
      Sie enthält den Debrid-Zugang und ist geheim.
+   - `AIOMETADATA_URL` (optional): die AIOMetadata-Manifest-URL. Enthält deine Einstellungen
+     und ggf. deinen Trakt-Zugang, ist ebenfalls geheim. Poster aus AIOMetadata werden nicht
+     übernommen, weil ihre Links Schlüssel enthalten können.
 2. **Pages** unter *Settings → Pages → Source*: **GitHub Actions**.
 3. *Actions → Katalog bauen → Run workflow* einmal manuell starten, mit Haken bei
    **„Erstinstallation“** (prüft 95 Titel). Danach füllen sich die Reihen stündlich weiter;

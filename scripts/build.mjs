@@ -2,7 +2,7 @@
 // AIOStreams prüfen, ob eine Fassung in der Zielsprache existiert, und nur diese
 // Titel als JSON-Kataloge nach public/ schreiben (wird von GitHub Pages ausgeliefert).
 //
-// Sicherheit: TMDB_KEY und AIOSTREAMS_URL kommen nur aus Umgebungsvariablen
+// Sicherheit: TMDB_KEY, AIOSTREAMS_URL und AIOMETADATA_URL kommen nur aus Umgebungsvariablen
 // (GitHub Secrets). Sie werden nie geloggt und nie in Ausgabedateien geschrieben.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -20,6 +20,9 @@ const OUT = process.env.OUT_DIR || join(ROOT, "public");
 const TMDB_KEY = process.env.TMDB_KEY || "";
 const AIO_URL = process.env.AIOSTREAMS_URL || "";
 const PAGES_URL = (process.env.PAGES_URL || "").replace(/\/+$/, "");
+// Optional: Reihen 1:1 aus deinem AIOMetadata übernehmen (sonst Rückfall auf TMDB)
+const AIOM_URL = /^https:\/\/.+\/manifest\.json$/.test(process.env.AIOMETADATA_URL || "") ? process.env.AIOMETADATA_URL : "";
+const AIOM_BASE = AIOM_URL ? AIOM_URL.slice(0, -"manifest.json".length) : "";
 
 const settings = JSON.parse(await readFile(join(ROOT, "config", "settings.json"), "utf8"));
 const now = Date.now();
@@ -85,8 +88,77 @@ async function fetchRow(row, lang) {
   return items;
 }
 
+// ---------- AIOMetadata (deine eigenen Reihen) ----------
+let aiomCatalogs = null;
+async function aiomManifest() {
+  if (aiomCatalogs) return aiomCatalogs;
+  const res = await fetch(AIOM_URL, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`AIOMetadata HTTP ${res.status}`);
+  aiomCatalogs = (await res.json()).catalogs || [];
+  return aiomCatalogs;
+}
+
+// Reihe über Typ und Namen finden (die internen IDs ändern sich, wenn du AIOMetadata umbaust)
+async function fetchRowAiom(row, state) {
+  const wanted = row.source.aiometadata;
+  const cat = (await aiomManifest()).find((c) => c.type === row.type && c.name === wanted);
+  if (!cat) throw new Error(`AIOMetadata-Reihe „${wanted}“ (${row.type}) nicht gefunden`);
+  const reverse = {};
+  for (const [k, v] of Object.entries(state.imdb)) if (v) reverse[v] = k;
+  const items = [];
+  const limit = settings.itemsPerRow || 60;
+  while (items.length < limit) {
+    const extra = items.length ? `/skip=${items.length}` : "";
+    const res = await fetch(`${AIOM_BASE}catalog/${row.type}/${encodeURIComponent(cat.id)}${extra}.json`);
+    if (!res.ok) throw new Error(`AIOMetadata HTTP ${res.status}`);
+    const metas = (await res.json()).metas || [];
+    if (!metas.length) break;
+    for (const m of metas) {
+      let key, tmdbId;
+      const tmdbMatch = /^tmdb:(\d+)$/.exec(m.id || "");
+      if (tmdbMatch) { tmdbId = Number(tmdbMatch[1]); key = `${row.type}:${tmdbId}`; }
+      else if (/^tt\d+$/.test(m.id || "")) {
+        key = reverse[m.id] || `${row.type}:${m.id}`;
+        if (state.imdb[key] === undefined) state.imdb[key] = m.id;
+      } else continue;
+      items.push({
+        // Poster bewusst NICHT übernehmen: Rating-Poster-Links können API-Schlüssel enthalten
+        key, tmdbId, type: row.type, name: m.name, poster: undefined,
+        description: m.description || undefined,
+        releaseDate: m.released || ((m.year || m.releaseInfo) ? `${String(m.year || m.releaseInfo).slice(0, 4)}-01-01` : ""),
+      });
+    }
+    if (metas.length < 10) break;
+    await sleep(300);
+  }
+  return items.slice(0, limit);
+}
+
+// Reihen nur alle paar Stunden neu holen (schont das ElfHosted-Limit), dazwischen aus dem Zwischenspeicher
+async function getRowItems(row, lang, state) {
+  state.rows ||= {};
+  const cached = state.rows[row.id];
+  const fresh = cached && now - cached.at < (settings.rowRefreshHours || 6) * HOUR;
+  if (fresh && cached.source === sourceKind(row)) return cached.items;
+  try {
+    const items = sourceKind(row) === "aiometadata" ? await fetchRowAiom(row, state) : await fetchRow(row, lang);
+    state.rows[row.id] = { at: now, source: sourceKind(row), items };
+    return items;
+  } catch (e) {
+    log(`Reihe ${row.name} (${row.type}) nicht geladen: ${e.message}`);
+    if (cached) return cached.items;
+    if (row.source.path || row.source.discover) return fetchRow(row, lang); // Rückfall auf TMDB
+    return [];
+  }
+}
+
+function sourceKind(row) {
+  return row.source.aiometadata && AIOM_URL ? "aiometadata" : "tmdb";
+}
+
 async function imdbIdFor(item, state) {
   if (state.imdb[item.key] !== undefined) return state.imdb[item.key];
+  if (!item.tmdbId) return null;
   const kind = item.type === "movie" ? "movie" : "tv";
   const ext = await tmdb(`/${kind}/${item.tmdbId}/external_ids`);
   const id = ext.imdb_id && /^tt\d+$/.test(ext.imdb_id) ? ext.imdb_id : null;
@@ -183,7 +255,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   // 1) Reihen holen
   const rowItems = [];
   for (const row of settings.rows) {
-    const items = await fetchRow(row, lang);
+    const items = await getRowItems(row, lang, state);
     rowItems.push({ row, items });
     log(`Reihe ${row.name} (${row.type}): ${items.length} Titel`);
   }
@@ -230,7 +302,8 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       const id = state.imdb[it.key];
       if (!id || used.has(id) || !results[it.key]?.ok) continue;
       used.add(id);
-      metas.push({ id, type: it.type, name: it.name, poster: it.poster, description: it.description });
+      const poster = it.poster || `https://images.metahub.space/poster/medium/${id}/img`;
+      metas.push({ id, type: it.type, name: it.name, poster, description: it.description });
     }
     await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
   }
