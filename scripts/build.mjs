@@ -1,0 +1,242 @@
+// Baut den statischen Stremio-Katalog: Reihen von TMDB holen, pro Titel über
+// AIOStreams prüfen, ob eine Fassung in der Zielsprache existiert, und nur diese
+// Titel als JSON-Kataloge nach public/ schreiben (wird von GitHub Pages ausgeliefert).
+//
+// Sicherheit: TMDB_KEY und AIOSTREAMS_URL kommen nur aus Umgebungsvariablen
+// (GitHub Secrets). Sie werden nie geloggt und nie in Ausgabedateien geschrieben.
+
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { detectLanguage } from "./detect.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const OUT = process.env.OUT_DIR || join(ROOT, "public");
+const TMDB_KEY = process.env.TMDB_KEY || "";
+const AIO_URL = process.env.AIOSTREAMS_URL || "";
+const PAGES_URL = (process.env.PAGES_URL || "").replace(/\/+$/, "");
+
+const settings = JSON.parse(await readFile(join(ROOT, "config", "settings.json"), "utf8"));
+const now = Date.now();
+const HOUR = 3600e3;
+const DAY = 24 * HOUR;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const log = (...a) => console.log(...a);
+
+if (!TMDB_KEY) throw new Error("TMDB_KEY fehlt (GitHub Secret).");
+if (!/^https:\/\/.+\/manifest\.json$/.test(AIO_URL)) {
+  throw new Error("AIOSTREAMS_URL fehlt oder endet nicht auf /manifest.json (GitHub Secret).");
+}
+const AIO_BASE = AIO_URL.slice(0, -"manifest.json".length);
+
+// ---------- TMDB ----------
+async function tmdb(path, params = {}) {
+  const url = new URL("https://api.themoviedb.org/3" + path);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  const headers = { accept: "application/json" };
+  // v4-Token (JWT) als Bearer, sonst klassischer v3-Key als Parameter
+  if (TMDB_KEY.startsWith("eyJ")) headers.authorization = `Bearer ${TMDB_KEY}`;
+  else url.searchParams.set("api_key", TMDB_KEY);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url, { headers });
+    if (res.status === 429) { await sleep(2000 * (attempt + 1)); continue; }
+    if (!res.ok) throw new Error(`TMDB ${path}: HTTP ${res.status}`);
+    return res.json();
+  }
+  throw new Error(`TMDB ${path}: zu viele Anfragen`);
+}
+
+async function fetchRow(row, lang) {
+  const kind = row.type === "movie" ? "movie" : "tv";
+  const items = [];
+  for (let page = 1; page <= (settings.pagesPerRow || 3); page++) {
+    let data;
+    if (row.source.discover) {
+      data = await tmdb(`/discover/${kind}`, {
+        language: lang.tmdbLanguage,
+        watch_region: lang.watchRegion,
+        with_watch_providers: row.source.providers,
+        with_watch_monetization_types: "flatrate",
+        sort_by: "popularity.desc",
+        page,
+      });
+    } else {
+      data = await tmdb(row.source.path, { language: lang.tmdbLanguage, region: lang.watchRegion, page });
+    }
+    for (const r of data.results || []) {
+      items.push({
+        key: `${row.type}:${r.id}`,
+        tmdbId: r.id,
+        type: row.type,
+        name: r.title || r.name,
+        poster: r.poster_path ? `https://image.tmdb.org/t/p/w342${r.poster_path}` : undefined,
+        description: r.overview || undefined,
+        releaseDate: r.release_date || r.first_air_date || "",
+      });
+    }
+    if (page >= (data.total_pages || 1)) break;
+  }
+  return items;
+}
+
+async function imdbIdFor(item, state) {
+  if (state.imdb[item.key] !== undefined) return state.imdb[item.key];
+  const kind = item.type === "movie" ? "movie" : "tv";
+  const ext = await tmdb(`/${kind}/${item.tmdbId}/external_ids`);
+  const id = ext.imdb_id && /^tt\d+$/.test(ext.imdb_id) ? ext.imdb_id : null;
+  state.imdb[item.key] = id;
+  await sleep(40);
+  return id;
+}
+
+// ---------- AIOStreams ----------
+async function checkTitle(type, imdbId, lang) {
+  const id = type === "series" ? `${imdbId}:1:1` : imdbId;
+  const url = `${AIO_BASE}stream/${type}/${encodeURIComponent(id)}.json`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90e3);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers: { accept: "application/json" } });
+    // Fehlermeldungen bewusst ohne URL, damit nichts Geheimes im Log landet
+    if (!res.ok) throw new Error(`AIOStreams HTTP ${res.status}`);
+    const data = await res.json();
+    return detectLanguage(data.streams || [], lang, { onlyCached: settings.check.onlyCached });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? "AIOStreams Zeitüberschreitung" : e.message);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------- Zustand (Cache) ----------
+async function loadState() {
+  const empty = { version: 1, imdb: {}, results: {} };
+  if (PAGES_URL) {
+    try {
+      const res = await fetch(`${PAGES_URL}/state.json`, { headers: { "cache-control": "no-cache" } });
+      if (res.ok) return { ...empty, ...(await res.json()) };
+    } catch { /* erster Lauf oder Seite noch nicht online */ }
+  }
+  try {
+    return { ...empty, ...JSON.parse(await readFile(join(OUT, "state.json"), "utf8")) };
+  } catch {
+    return empty;
+  }
+}
+
+function isDue(result, item) {
+  if (!result) return true;
+  const c = settings.check;
+  const age = now - result.at;
+  if (result.ok) return age > c.recheckPositiveDays * DAY;
+  const released = Date.parse(item.releaseDate);
+  const isOld = Number.isFinite(released) && now - released > c.oldTitleDays * DAY;
+  return age > (isOld ? c.recheckNegativeOldDays * DAY : c.recheckNegativeHours * HOUR);
+}
+
+// ---------- Ausgabe ----------
+async function writeJson(path, data) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(data));
+}
+
+function manifestFor(code, lang, rows) {
+  return {
+    id: `community.sprachkatalog.${code}`,
+    version: "1.0.0",
+    name: `Sprachkatalog ${lang.label}`,
+    description: `Bekannte Reihen, aber nur Titel, für die eine Fassung auf ${lang.label} verfügbar ist.`,
+    resources: ["catalog"],
+    types: ["movie", "series"],
+    idPrefixes: ["tt"],
+    catalogs: rows.map((r) => ({
+      type: r.type,
+      id: `${r.id}-${code}`,
+      name: `${r.name}${lang.suffix}`,
+    })),
+    behaviorHints: { configurable: false, configurationRequired: false },
+  };
+}
+
+// ---------- Ablauf ----------
+const state = await loadState();
+let checksLeft = settings.check.maxChecksPerRun;
+let failuresInRow = 0;
+const summary = [];
+
+for (const [code, lang] of Object.entries(settings.languages)) {
+  if (!lang.active) continue;
+  state.results[code] ||= {};
+  const results = state.results[code];
+
+  // 1) Reihen holen
+  const rowItems = [];
+  for (const row of settings.rows) {
+    const items = await fetchRow(row, lang);
+    rowItems.push({ row, items });
+    log(`Reihe ${row.name} (${row.type}): ${items.length} Titel`);
+  }
+
+  // 2) Prüfreihenfolge: zuerst nie geprüfte Titel, dann fällige Wiederholungen
+  const seen = new Set();
+  const queue = [];
+  for (const { items } of rowItems) for (const it of items) {
+    if (seen.has(it.key)) continue;
+    seen.add(it.key);
+    if (isDue(results[it.key], it)) queue.push(it);
+  }
+  queue.sort((a, b) => (results[a.key] ? 1 : 0) - (results[b.key] ? 1 : 0));
+
+  // 3) Prüfen (begrenzt pro Lauf, Rest folgt in den nächsten Läufen)
+  let checked = 0, found = 0;
+  for (const it of queue) {
+    if (checksLeft <= 0 || failuresInRow >= 5) break;
+    const imdbId = await imdbIdFor(it, state);
+    if (!imdbId) continue;
+    try {
+      const ok = await checkTitle(it.type, imdbId, lang);
+      results[it.key] = { ok, at: now };
+      checked++; checksLeft--; failuresInRow = 0;
+      if (ok) found++;
+    } catch (e) {
+      failuresInRow++;
+      log(`Prüfung fehlgeschlagen (${it.name}): ${e.message}`);
+    }
+    await sleep(settings.check.delayMs);
+  }
+  if (failuresInRow >= 5) log("Abbruch nach 5 Fehlern in Folge, Rest beim nächsten Lauf.");
+
+  // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
+  for (const { row, items } of rowItems) {
+    const metas = [];
+    const used = new Set();
+    for (const it of items) {
+      const id = state.imdb[it.key];
+      if (!id || used.has(id) || !results[it.key]?.ok) continue;
+      used.add(id);
+      metas.push({ id, type: it.type, name: it.name, poster: it.poster, description: it.description });
+    }
+    await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
+  }
+  await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, settings.rows));
+
+  const pending = queue.length - checked;
+  summary.push(`${lang.label}: ${checked} geprüft, ${found} mit ${lang.label}, ${Math.max(pending, 0)} noch offen`);
+}
+
+state.updatedAt = new Date(now).toISOString();
+await writeJson(join(OUT, "state.json"), state);
+await writeFile(join(OUT, ".nojekyll"), "");
+await writeFile(join(OUT, "index.html"), indexHtml());
+log(summary.join("\n"));
+
+function indexHtml() {
+  const langs = Object.entries(settings.languages).filter(([, l]) => l.active);
+  const links = langs.map(([code, l]) =>
+    `<li>${l.flag} ${l.label}: <code>${PAGES_URL || "."}/${code}/manifest.json</code></li>`).join("");
+  return `<!doctype html><meta charset="utf-8"><title>Sprachkatalog</title>
+<body style="font-family:system-ui;max-width:640px;margin:40px auto;padding:0 16px">
+<h1>Sprachkatalog</h1><p>Stremio/Nuvio-Addon-Links (in der App unter Addons einfügen):</p>
+<ul>${links}</ul><p>Stand: ${new Date(now).toLocaleString("de-CH")}</p></body>`;
+}

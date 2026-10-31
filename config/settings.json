@@ -1,0 +1,52 @@
+{
+  "_hinweis": "Neue Sprache = neuer Eintrag unter languages. Neue Reihe = neuer Eintrag unter rows. Keine Codeänderung nötig.",
+  "languages": {
+    "de": {
+      "active": true,
+      "label": "Deutsch",
+      "suffix": " – Deutsch",
+      "tmdbLanguage": "de-DE",
+      "watchRegion": "CH",
+      "flag": "🇩🇪",
+      "filenamePattern": "(^|[^a-z])(german|ger|deutsch)([^a-z]|$)"
+    },
+    "it": {
+      "active": false,
+      "label": "Italiano",
+      "suffix": " – Italiano",
+      "tmdbLanguage": "it-IT",
+      "watchRegion": "IT",
+      "flag": "🇮🇹",
+      "filenamePattern": "(^|[^a-z])(italian|ita|italiano)([^a-z]|$)"
+    }
+  },
+  "check": {
+    "maxChecksPerRun": 150,
+    "delayMs": 1500,
+    "onlyCached": true,
+    "recheckPositiveDays": 30,
+    "recheckNegativeHours": 24,
+    "recheckNegativeOldDays": 7,
+    "oldTitleDays": 365
+  },
+  "rows": [
+    { "id": "trending-movie", "type": "movie", "name": "Gerade angesagt", "source": { "path": "/trending/movie/week" } },
+
+    { "id": "netflix-movie", "type": "movie", "name": "Netflix", "source": { "discover": true, "providers": "8" } },
+    { "id": "netflix-series", "type": "series", "name": "Netflix", "source": { "discover": true, "providers": "8" } },
+    { "id": "hbomax-movie", "type": "movie", "name": "HBO Max", "source": { "discover": true, "providers": "1899" } },
+    { "id": "hbomax-series", "type": "series", "name": "HBO Max", "source": { "discover": true, "providers": "1899" } },
+    { "id": "disney-movie", "type": "movie", "name": "Disney+", "source": { "discover": true, "providers": "337" } },
+    { "id": "disney-series", "type": "series", "name": "Disney+", "source": { "discover": true, "providers": "337" } },
+    { "id": "appletv-movie", "type": "movie", "name": "Apple TV+", "source": { "discover": true, "providers": "350" } },
+    { "id": "appletv-series", "type": "series", "name": "Apple TV+", "source": { "discover": true, "providers": "350" } },
+    { "id": "prime-movie", "type": "movie", "name": "Prime Video", "source": { "discover": true, "providers": "119" } },
+    { "id": "prime-series", "type": "series", "name": "Prime Video", "source": { "discover": true, "providers": "119" } },
+
+    { "id": "popular-movie", "type": "movie", "name": "Beliebt", "source": { "path": "/movie/popular" } },
+    { "id": "popular-series", "type": "series", "name": "Beliebt", "source": { "path": "/tv/popular" } },
+    { "id": "toprated-movie", "type": "movie", "name": "Top bewertet", "source": { "path": "/movie/top_rated" } },
+    { "id": "toprated-series", "type": "series", "name": "Top bewertet", "source": { "path": "/tv/top_rated" } }
+  ],
+  "pagesPerRow": 3
+}
