@@ -23,8 +23,8 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
    - `AIOSTREAMS_URL`: die AIOStreams-Manifest-URL (endet auf `/manifest.json`).
      Sie enthält den Debrid-Zugang und ist geheim.
    - `AIOMETADATA_URL` (optional): die AIOMetadata-Manifest-URL. Enthält deine Einstellungen
-     und ggf. deinen Trakt-Zugang, ist ebenfalls geheim. Poster aus AIOMetadata werden nicht
-     übernommen, weil ihre Links Schlüssel enthalten können.
+     und ggf. deinen Trakt-Zugang, ist ebenfalls geheim. Poster (mit Bewertungen) werden nur übernommen,
+     wenn der Link keinen privaten Schlüssel und keinen Teil dieser Adresse enthält.
 2. **Pages** unter *Settings → Pages → Source*: **GitHub Actions**.
 3. *Actions → Katalog bauen → Run workflow* einmal manuell starten, mit Haken bei
    **„Erstinstallation“** (prüft 95 Titel). Danach füllen sich die Reihen stündlich weiter;

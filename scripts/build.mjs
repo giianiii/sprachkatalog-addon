@@ -9,6 +9,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectLanguage, isRateLimited } from "./detect.mjs";
+import { safePoster } from "./poster.mjs";
 
 // Öffentliche AIOStreams-Instanz: 100 Abfragen auf Vorrat, dann 1 pro Minute.
 class RateLimitError extends Error {
@@ -122,8 +123,8 @@ async function fetchRowAiom(row, state) {
         if (state.imdb[key] === undefined) state.imdb[key] = m.id;
       } else continue;
       items.push({
-        // Poster bewusst NICHT übernehmen: Rating-Poster-Links können API-Schlüssel enthalten
-        key, tmdbId, type: row.type, name: m.name, poster: undefined,
+        // Rating-Poster nur übernehmen, wenn der Link nichts Geheimes enthält (siehe safePoster)
+        key, tmdbId, type: row.type, name: m.name, poster: safePoster(m.poster, AIOM_URL),
         description: m.description || undefined,
         releaseDate: m.released || ((m.year || m.releaseInfo) ? `${String(m.year || m.releaseInfo).slice(0, 4)}-01-01` : ""),
       });
