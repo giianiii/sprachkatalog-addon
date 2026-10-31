@@ -21,7 +21,9 @@
     }
   },
   "check": {
-    "maxChecksPerRun": 150,
+    "_limit": "Öffentliche AIOStreams-Instanz: 100 Abfragen Vorrat, dann 1 pro Minute. Stündlicher Lauf mit 55 bleibt darunter.",
+    "maxChecksPerRun": 55,
+    "maxChecksFirstRun": 95,
     "delayMs": 1500,
     "onlyCached": true,
     "recheckPositiveDays": 30,

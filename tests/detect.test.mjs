@@ -46,3 +46,10 @@ test("ungecacht zählt nur, wenn onlyCached aus ist", () => {
   assert.equal(detectLanguage([s], de, { onlyCached: true }), false);
   assert.equal(detectLanguage([s], de, { onlyCached: false }), true);
 });
+
+import { isRateLimited } from "../scripts/detect.mjs";
+
+test("Limit-Hinweis von ElfHosted wird erkannt", () => {
+  assert.equal(isRateLimited([{ name: "🐢 AIOStreams", description: "public rate-limit exceeded" }]), true);
+  assert.equal(isRateLimited([{ name: "1080P ⚡", description: "🔊 🇩🇪" }]), false);
+});

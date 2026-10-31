@@ -6,12 +6,13 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
 
 ## So funktioniert es
 
-1. Alle 6 Stunden holt ein GitHub-Actions-Job die Reihen von TMDB (Region CH).
+1. Jede Stunde holt ein GitHub-Actions-Job die Reihen von TMDB (Region CH).
 2. Für jeden Titel fragt er die eigene AIOStreams-Konfiguration ab, ob ein gecachter
    Stream mit deutscher Tonspur existiert (Serien: Stichprobe S01E01).
 3. Ergebnisse werden zwischengespeichert: bestätigte Titel werden alle 30 Tage erneut
    geprüft, Titel ohne deutsche Fassung täglich (ältere wöchentlich). Pro Lauf höchstens
-   150 Prüfungen, der Rest folgt in den nächsten Läufen.
+   55 Prüfungen: Die öffentliche AIOStreams-Instanz erlaubt 100 Abfragen auf Vorrat und
+   danach 1 pro Minute. Erreicht ein Lauf das Limit, bricht er ohne falsche Ergebnisse ab.
 4. Die fertigen JSON-Kataloge liefert GitHub Pages statisch aus.
 
 ## Einrichtung
@@ -22,8 +23,8 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
      Sie enthält den Debrid-Zugang und ist geheim.
 2. **Pages** unter *Settings → Pages → Source*: **GitHub Actions**.
 3. *Actions → Katalog bauen → Run workflow* einmal manuell starten, mit Haken bei
-   **„Alles auf einmal prüfen“**. Das dauert 1–2 Stunden; danach läuft alles automatisch
-   schrittweise weiter.
+   **„Erstinstallation“** (prüft 95 Titel). Danach füllen sich die Reihen stündlich weiter;
+   bei rund 900 Titeln sind nach etwa 15 Stunden alle einmal geprüft.
 4. In Stremio/Nuvio als Addon einfügen: `https://<benutzer>.github.io/sprachkatalog-addon/de/manifest.json`
 
 ## Anpassen

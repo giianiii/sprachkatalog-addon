@@ -32,6 +32,11 @@ export function streamHasLanguage(stream, lang) {
   return false;
 }
 
+// ElfHosted ersetzt bei erreichtem Limit die Liste durch einen einzelnen Hinweis-Eintrag.
+export function isRateLimited(streams) {
+  return streams.some((s) => /rate.?limit/i.test(`${s.name || ""} ${s.description || ""} ${s.title || ""}`));
+}
+
 export function isCached(stream) {
   return (stream.name || "").includes("⚡");
 }

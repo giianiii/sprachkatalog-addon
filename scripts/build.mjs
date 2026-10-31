@@ -8,7 +8,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectLanguage } from "./detect.mjs";
+import { detectLanguage, isRateLimited } from "./detect.mjs";
+
+// Öffentliche AIOStreams-Instanz: 100 Abfragen auf Vorrat, dann 1 pro Minute.
+class RateLimitError extends Error {
+  constructor() { super("AIOStreams-Limit erreicht"); this.name = "RateLimitError"; }
+}
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = process.env.OUT_DIR || join(ROOT, "public");
@@ -101,8 +106,10 @@ async function checkTitle(type, imdbId, lang) {
     // Fehlermeldungen bewusst ohne URL, damit nichts Geheimes im Log landet
     if (!res.ok) throw new Error(`AIOStreams HTTP ${res.status}`);
     const data = await res.json();
+    if (isRateLimited(data.streams || [])) throw new RateLimitError();
     return detectLanguage(data.streams || [], lang, { onlyCached: settings.check.onlyCached });
   } catch (e) {
+    if (e instanceof RateLimitError) throw e;
     throw new Error(e.name === "AbortError" ? "AIOStreams Zeitüberschreitung" : e.message);
   } finally {
     clearTimeout(timer);
@@ -161,10 +168,10 @@ function manifestFor(code, lang, rows) {
 
 // ---------- Ablauf ----------
 const state = await loadState();
-// Erstinstallation: alles prüfen (Pausen und Fehlerabbruch bleiben aktiv)
+// Erstinstallation: volles Kontingent nutzen (bei vollem Vorrat 100 Abfragen)
 const CHECK_ALL = process.env.CHECK_ALL === "true";
-let checksLeft = CHECK_ALL ? Infinity : settings.check.maxChecksPerRun;
-if (CHECK_ALL) log("Modus: alles prüfen");
+let checksLeft = CHECK_ALL ? settings.check.maxChecksFirstRun : settings.check.maxChecksPerRun;
+if (CHECK_ALL) log("Modus: Erstinstallation");
 let failuresInRow = 0;
 const summary = [];
 
@@ -203,6 +210,11 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       checked++; checksLeft--; failuresInRow = 0;
       if (ok) found++;
     } catch (e) {
+      if (e instanceof RateLimitError) {
+        log("AIOStreams-Limit erreicht, Rest beim nächsten Lauf.");
+        checksLeft = 0;
+        break;
+      }
       failuresInRow++;
       log(`Prüfung fehlgeschlagen (${it.name}): ${e.message}`);
     }

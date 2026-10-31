@@ -2,11 +2,11 @@ name: Katalog bauen
 
 on:
   schedule:
-    - cron: "17 */6 * * *"   # alle 6 Stunden
+    - cron: "17 * * * *"     # stündlich, passend zum AIOStreams-Limit (1 Abfrage/Minute)
   workflow_dispatch:          # manuell starten über "Run workflow"
     inputs:
       alles:
-        description: "Alles auf einmal prüfen (für die Erstinstallation, dauert 1–2 Stunden)"
+        description: "Erstinstallation: volles Kontingent nutzen (95 statt 55 Titel)"
         type: boolean
         default: false
 
@@ -23,7 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 50
     steps:
       # Offizielle Actions, auf feste Commit-Stände gepinnt
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
