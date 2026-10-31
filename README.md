@@ -21,7 +21,9 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
    - `AIOSTREAMS_URL`: die AIOStreams-Manifest-URL (endet auf `/manifest.json`).
      Sie enthält den Debrid-Zugang und ist geheim.
 2. **Pages** unter *Settings → Pages → Source*: **GitHub Actions**.
-3. *Actions → Katalog bauen → Run workflow* einmal manuell starten.
+3. *Actions → Katalog bauen → Run workflow* einmal manuell starten, mit Haken bei
+   **„Alles auf einmal prüfen“**. Das dauert 1–2 Stunden; danach läuft alles automatisch
+   schrittweise weiter.
 4. In Stremio/Nuvio als Addon einfügen: `https://<benutzer>.github.io/sprachkatalog-addon/de/manifest.json`
 
 ## Anpassen

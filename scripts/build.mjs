@@ -161,7 +161,10 @@ function manifestFor(code, lang, rows) {
 
 // ---------- Ablauf ----------
 const state = await loadState();
-let checksLeft = settings.check.maxChecksPerRun;
+// Erstinstallation: alles prüfen (Pausen und Fehlerabbruch bleiben aktiv)
+const CHECK_ALL = process.env.CHECK_ALL === "true";
+let checksLeft = CHECK_ALL ? Infinity : settings.check.maxChecksPerRun;
+if (CHECK_ALL) log("Modus: alles prüfen");
 let failuresInRow = 0;
 const summary = [];
 

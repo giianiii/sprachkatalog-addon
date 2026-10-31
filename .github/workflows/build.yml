@@ -3,7 +3,12 @@ name: Katalog bauen
 on:
   schedule:
     - cron: "17 */6 * * *"   # alle 6 Stunden
-  workflow_dispatch: {}       # manuell starten über "Run workflow"
+  workflow_dispatch:          # manuell starten über "Run workflow"
+    inputs:
+      alles:
+        description: "Alles auf einmal prüfen (für die Erstinstallation, dauert 1–2 Stunden)"
+        type: boolean
+        default: false
 
 # Minimale Rechte: nur Code lesen und GitHub Pages veröffentlichen
 permissions:
@@ -18,7 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 300
     steps:
       # Offizielle Actions, auf feste Commit-Stände gepinnt
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,6 +41,7 @@ jobs:
           TMDB_KEY: ${{ secrets.TMDB_KEY }}
           AIOSTREAMS_URL: ${{ secrets.AIOSTREAMS_URL }}
           PAGES_URL: ${{ steps.pages.outputs.base_url }}
+          CHECK_ALL: ${{ inputs.alles && 'true' || 'false' }}
         run: node scripts/build.mjs
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
