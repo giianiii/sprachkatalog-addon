@@ -43,5 +43,7 @@ Prime Video 119, HBO Max 1899.
 - Schlüssel nur als GitHub Secrets; nie in Dateien, Logs oder Ausgaben.
 - Nur offizielle `actions/*`, auf Commit-Stände gepinnt; minimale Workflow-Rechte;
   kein `pull_request_target`.
+- Der Ablauf „Aktiv halten“ ändert einmal im Monat nur `.github/keepalive.txt`, damit GitHub die
+  stündliche Prüfung nicht nach 60 Tagen ohne Änderung abschaltet. Nur er darf ins Repo schreiben.
 - Keine Torrent-Scraper im Code: geprüft wird ausschliesslich über die eigene AIOStreams-URL.
 - Notfall: TorBox-Key im TorBox-Konto neu erzeugen und AIOStreams-Konfiguration neu anlegen.
