@@ -42,6 +42,42 @@
       }
     },
     {
+      "id": "popular-movie",
+      "type": "movie",
+      "name": "Beliebt",
+      "source": {
+        "path": "/movie/popular",
+        "aiometadata": "Beliebt"
+      }
+    },
+    {
+      "id": "popular-series",
+      "type": "series",
+      "name": "Beliebt",
+      "source": {
+        "path": "/tv/popular",
+        "aiometadata": "Beliebt"
+      }
+    },
+    {
+      "id": "toprated-movie",
+      "type": "movie",
+      "name": "Top bewertet",
+      "source": {
+        "path": "/movie/top_rated",
+        "aiometadata": "Top bewertet"
+      }
+    },
+    {
+      "id": "toprated-series",
+      "type": "series",
+      "name": "Top bewertet",
+      "source": {
+        "path": "/tv/top_rated",
+        "aiometadata": "Top bewertet"
+      }
+    },
+    {
       "id": "netflix-movie",
       "type": "movie",
       "name": "Netflix",
@@ -139,42 +175,6 @@
         "discover": true,
         "providers": "119",
         "aiometadata": "Prime Video"
-      }
-    },
-    {
-      "id": "popular-movie",
-      "type": "movie",
-      "name": "Beliebt",
-      "source": {
-        "path": "/movie/popular",
-        "aiometadata": "Beliebt"
-      }
-    },
-    {
-      "id": "popular-series",
-      "type": "series",
-      "name": "Beliebt",
-      "source": {
-        "path": "/tv/popular",
-        "aiometadata": "Beliebt"
-      }
-    },
-    {
-      "id": "toprated-movie",
-      "type": "movie",
-      "name": "Top bewertet",
-      "source": {
-        "path": "/movie/top_rated",
-        "aiometadata": "Top bewertet"
-      }
-    },
-    {
-      "id": "toprated-series",
-      "type": "series",
-      "name": "Top bewertet",
-      "source": {
-        "path": "/tv/top_rated",
-        "aiometadata": "Top bewertet"
       }
     }
   ],
