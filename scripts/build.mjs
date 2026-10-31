@@ -169,8 +169,7 @@ async function imdbIdFor(item, state) {
 }
 
 // ---------- AIOStreams ----------
-async function checkTitle(type, imdbId, lang) {
-  const id = type === "series" ? `${imdbId}:1:1` : imdbId;
+async function checkStream(type, id, lang) {
   const url = `${AIO_BASE}stream/${type}/${encodeURIComponent(id)}.json`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 90e3);
@@ -187,6 +186,46 @@ async function checkTitle(type, imdbId, lang) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Neueste ausgestrahlte Staffel von TMDB (zählt nicht zum AIOStreams-Limit), 7 Tage zwischengespeichert
+async function latestSeason(item, imdbId, state) {
+  state.seasons ||= {};
+  const cached = state.seasons[imdbId];
+  if (cached && now - cached.at < 7 * DAY) return cached.season;
+  let season = 1;
+  try {
+    let tmdbId = item.tmdbId;
+    if (!tmdbId) {
+      const found = await tmdb(`/find/${imdbId}`, { external_source: "imdb_id" });
+      tmdbId = found.tv_results?.[0]?.id;
+    }
+    if (tmdbId) {
+      const tv = await tmdb(`/tv/${tmdbId}`);
+      const s = tv.last_episode_to_air?.season_number;
+      if (Number.isInteger(s) && s >= 1) season = s;
+    }
+  } catch (e) {
+    log(`Staffel für ${item.name} nicht ermittelt: ${e.message}`);
+  }
+  state.seasons[imdbId] = { season, at: now };
+  return season;
+}
+
+// Filme: eine Abfrage. Serien: erst Folge 1 der neuesten Staffel (am ehesten gecacht),
+// nur wenn dort nichts Deutsches ist zusätzlich S01E01. Gibt Ergebnis und verbrauchte Abfragen zurück.
+async function checkTitle(item, imdbId, lang, state, budget) {
+  if (item.type !== "series") return { ok: await checkStream("movie", imdbId, lang), used: 1 };
+  const latest = await latestSeason(item, imdbId, state);
+  const candidates = [...new Set([`${imdbId}:${latest}:1`, `${imdbId}:1:1`])];
+  let used = 0;
+  for (const id of candidates) {
+    if (used >= budget) return { ok: false, used, incomplete: true };
+    if (used > 0) await sleep(settings.check.delayMs);
+    used++;
+    if (await checkStream("series", id, lang)) return { ok: true, used };
+  }
+  return { ok: false, used };
 }
 
 // ---------- Zustand (Cache) ----------
@@ -278,9 +317,10 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     const imdbId = await imdbIdFor(it, state);
     if (!imdbId) continue;
     try {
-      const ok = await checkTitle(it.type, imdbId, lang);
+      const { ok, used, incomplete } = await checkTitle(it, imdbId, lang, state, checksLeft);
+      if (incomplete) { checksLeft -= used; break; } // Kontingent erschöpft: nicht als „kein Deutsch“ werten
       results[it.key] = { ok, at: now };
-      checked++; checksLeft--; failuresInRow = 0;
+      checked++; checksLeft -= used; failuresInRow = 0;
       if (ok) found++;
     } catch (e) {
       if (e instanceof RateLimitError) {

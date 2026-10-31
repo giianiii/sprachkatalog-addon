@@ -9,7 +9,8 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
 1. Jede Stunde läuft ein GitHub-Actions-Job. Die Reihen holt er alle 6 Stunden aus deinem
    AIOMetadata (dieselben Listen wie auf deiner Startseite); ohne AIOMetadata direkt von TMDB (Region CH).
 2. Für jeden Titel fragt er die eigene AIOStreams-Konfiguration ab, ob ein gecachter
-   Stream mit deutscher Tonspur existiert (Serien: Stichprobe S01E01).
+   Stream mit deutscher Tonspur existiert. Serien: zuerst Folge 1 der neuesten Staffel
+   (am ehesten gecacht), sonst zusätzlich S01E01.
 3. Ergebnisse werden zwischengespeichert: bestätigte Titel werden alle 30 Tage erneut
    geprüft, Titel ohne deutsche Fassung täglich (ältere wöchentlich). Pro Lauf höchstens
    55 Prüfungen: Die öffentliche AIOStreams-Instanz erlaubt 100 Abfragen auf Vorrat und
