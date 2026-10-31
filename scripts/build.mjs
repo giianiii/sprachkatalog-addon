@@ -99,6 +99,20 @@ async function aiomManifest() {
   return aiomCatalogs;
 }
 
+// Nur harmlose Anzeigefelder übernehmen; Bild-Links nur, wenn sie nichts Geheimes enthalten
+function pickExtra(m) {
+  const out = {};
+  for (const k of ["releaseInfo", "year", "imdbRating", "runtime"]) {
+    if (typeof m[k] === "string" || typeof m[k] === "number") out[k] = String(m[k]).slice(0, 40);
+  }
+  if (Array.isArray(m.genres)) out.genres = m.genres.filter((g) => typeof g === "string").slice(0, 6);
+  for (const k of ["background", "logo"]) {
+    const safe = safePoster(m[k], AIOM_URL);
+    if (safe) out[k] = safe;
+  }
+  return out;
+}
+
 // Reihe über Typ und Namen finden (die internen IDs ändern sich, wenn du AIOMetadata umbaust)
 async function fetchRowAiom(row, state) {
   const wanted = row.source.aiometadata;
@@ -126,6 +140,8 @@ async function fetchRowAiom(row, state) {
         // Rating-Poster nur übernehmen, wenn der Link nichts Geheimes enthält (siehe safePoster)
         key, tmdbId, type: row.type, name: m.name, poster: safePoster(m.poster, AIOM_URL),
         description: m.description || undefined,
+        // Anzeige-Infos wie in deinen normalen Reihen (Jahr, Genres, Bewertung, Hintergrund, Logo)
+        extra: pickExtra(m),
         releaseDate: m.released || ((m.year || m.releaseInfo) ? `${String(m.year || m.releaseInfo).slice(0, 4)}-01-01` : ""),
       });
     }
@@ -344,7 +360,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       if (!id || used.has(id) || !results[it.key]?.ok) continue;
       used.add(id);
       const poster = it.poster || `https://images.metahub.space/poster/medium/${id}/img`;
-      metas.push({ id, type: it.type, name: it.name, poster, description: it.description });
+      metas.push({ id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) });
     }
     await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
   }
