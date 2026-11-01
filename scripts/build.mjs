@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { detectLanguage, isRateLimited } from "./detect.mjs";
 import { safePoster } from "./poster.mjs";
+import { groupByGenre, genreFileName } from "./genres.mjs";
 
 // Öffentliche AIOStreams-Instanz: 100 Abfragen auf Vorrat, dann 1 pro Minute.
 class RateLimitError extends Error {
@@ -278,10 +279,10 @@ async function writeJson(path, data) {
   await writeFile(path, JSON.stringify(data));
 }
 
-function manifestFor(code, lang, rows) {
+function manifestFor(code, lang, rows, genresByRow = {}) {
   return {
     id: `community.sprachkatalog.${code}`,
-    version: "1.0.0",
+    version: "1.1.0",
     name: `Sprachkatalog ${lang.label}`,
     description: `Bekannte Reihen, aber nur Titel, für die eine Fassung auf ${lang.label} verfügbar ist.`,
     resources: ["catalog"],
@@ -291,6 +292,10 @@ function manifestFor(code, lang, rows) {
       type: r.type,
       id: `${r.id}-${code}`,
       name: `${r.name}${lang.suffix}`,
+      // Genre-Auswahl in Nuvio/Stremio (nur Genres, die in dieser Reihe vorkommen)
+      ...(genresByRow[r.id]?.length
+        ? { extra: [{ name: "genre", options: genresByRow[r.id], isRequired: false }] }
+        : {}),
     })),
     behaviorHints: { configurable: false, configurationRequired: false },
   };
@@ -354,6 +359,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   if (failuresInRow >= 5) log("Abbruch nach 5 Fehlern in Folge, Rest beim nächsten Lauf.");
 
   // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
+  const genresByRow = {};
   for (const { row, items } of rowItems) {
     const metas = [];
     const used = new Set();
@@ -365,8 +371,14 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       metas.push({ id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) });
     }
     await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
+    // Pro Genre eine gefilterte Fassung derselben Reihe
+    const groups = groupByGenre(metas);
+    for (const [genre, list] of groups) {
+      await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}`, genreFileName(genre)), { metas: list });
+    }
+    genresByRow[row.id] = [...groups.keys()];
   }
-  await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, settings.rows));
+  await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, settings.rows, genresByRow));
 
   const pending = queue.length - checked;
   summary.push(`${lang.label}: ${checked} geprüft, ${found} mit ${lang.label}, ${Math.max(pending, 0)} noch offen`);
