@@ -156,7 +156,9 @@ async function getRowItems(row, lang, state) {
   state.rows ||= {};
   const cached = state.rows[row.id];
   const fresh = cached && now - cached.at < (settings.rowRefreshHours || 6) * HOUR;
-  if (fresh && cached.source === sourceKind(row)) return cached.items;
+  // Zwischenspeicher aus älteren Versionen (ohne Jahr/Genres) nicht weiterverwenden
+  const complete = sourceKind(row) !== "aiometadata" || (cached?.items || []).every((it) => it.extra);
+  if (fresh && complete && cached.source === sourceKind(row)) return cached.items;
   try {
     const items = sourceKind(row) === "aiometadata" ? await fetchRowAiom(row, state) : await fetchRow(row, lang);
     state.rows[row.id] = { at: now, source: sourceKind(row), items };
