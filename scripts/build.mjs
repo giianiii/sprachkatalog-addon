@@ -409,6 +409,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   const genresByRow = {};
   const allByType = { movie: [], series: [] };
   const inAll = new Set();
+  const keyById = {};
   for (const { row, items } of rowItems) {
     const metas = [];
     const used = new Set();
@@ -419,7 +420,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       const poster = it.poster || `https://images.metahub.space/poster/medium/${id}/img`;
       const meta = { id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) };
       metas.push(meta);
-      if (!inAll.has(id) && allByType[it.type]) { inAll.add(id); allByType[it.type].push(meta); }
+      if (!inAll.has(id) && allByType[it.type]) { inAll.add(id); keyById[id] = it.key; allByType[it.type].push(meta); }
     }
     await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
     // Pro Genre eine gefilterte Fassung derselben Reihe
@@ -429,6 +430,21 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     }
     genresByRow[row.id] = [...groups.keys()];
   }
+  // Archiv: einmal bestätigte Titel bleiben in „Alle“, auch wenn sie aus den Reihen fallen.
+  // Fällt eine spätere Prüfung negativ aus, fliegen sie wieder raus.
+  state.archive ||= {};
+  const archive = (state.archive[code] ||= {});
+  for (const [id, entry] of Object.entries(archive)) {
+    if (results[entry.key] && !results[entry.key].ok) delete archive[id];
+  }
+  for (const type of Object.keys(allByType)) {
+    for (const meta of allByType[type]) archive[meta.id] = { key: keyById[meta.id], at: now, meta };
+  }
+  const archived = Object.values(archive).sort((a, b) => b.at - a.at);
+  for (const { meta } of archived) {
+    if (!inAll.has(meta.id) && allByType[meta.type]) { inAll.add(meta.id); allByType[meta.type].push(meta); }
+  }
+
   // Sammelreihen: alles in einer Datei (die Apps fragen danach mit skip nach, bekommen 404 und hören auf)
   for (const row of ALL_ROWS) {
     const metas = allByType[row.type];
