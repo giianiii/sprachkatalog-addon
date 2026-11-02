@@ -26,8 +26,8 @@
     "maxChecksFirstRun": 95,
     "delayMs": 1500,
     "onlyCached": true,
-    "recheckPositiveDays": 30,
-    "recheckNegativeHours": 24,
+    "recheckPositiveDays": 45,
+    "recheckNegativeHours": 48,
     "recheckNegativeOldDays": 7,
     "oldTitleDays": 365
   },
@@ -180,7 +180,7 @@
   ],
   "pagesPerRow": 3,
   "_quelle": "Reihen kommen aus deinem AIOMetadata (Name der Reihe unter source.aiometadata). Ohne AIOMETADATA_URL wird auf TMDB (path/discover) zurückgegriffen.",
-  "itemsPerRow": 60,
+  "itemsPerRow": 300,
   "rowRefreshHours": 6,
   "pool": {
     "_info": "Bekannteste Titel von TMDB (nach Stimmenzahl), werden im Hintergrund geprüft und landen nur in „Alle – Deutsch“.",

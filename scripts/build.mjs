@@ -361,7 +361,7 @@ async function writePaged(dir, catalogId, extra, metas) {
 function manifestFor(code, lang, rows, genresByRow = {}) {
   return {
     id: `community.sprachkatalog.${code}`,
-    version: "1.3.0",
+    version: "1.4.0",
     name: `Sprachkatalog ${lang.label}`,
     description: `Bekannte Reihen, aber nur Titel, für die eine Fassung auf ${lang.label} verfügbar ist.`,
     resources: ["catalog"],
@@ -373,7 +373,7 @@ function manifestFor(code, lang, rows, genresByRow = {}) {
       name: `${r.name}${lang.suffix}`,
       // Genre-Auswahl in Nuvio/Stremio (nur Genres, die in dieser Reihe vorkommen)
       ...(genresByRow[r.id]?.length
-        ? { extra: [{ name: "genre", options: genresByRow[r.id], isRequired: false }, ...(r.id.startsWith("all-") ? [{ name: "skip" }] : [])] }
+        ? { extra: [{ name: "genre", options: genresByRow[r.id], isRequired: false }, { name: "skip" }] }
         : {}),
     })),
     behaviorHints: { configurable: false, configurationRequired: false },
@@ -468,7 +468,13 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   if (failuresInRow >= 5) log("Abbruch nach 5 Fehlern in Folge, Rest beim nächsten Lauf.");
 
   // Übersicht pro Reihe (öffentlich, enthält nur Titelnamen): status-<sprache>.json
-  const status = { updatedAt: new Date(now).toISOString(), rows: [] };
+  // Rückstand nach diesem Lauf: fällige Titel, die nicht drankamen
+  const status = {
+    updatedAt: new Date(now).toISOString(),
+    neuOffen: queue.filter((it) => !results[it.key]).length,
+    wartendeNachpruefungen: queue.filter((it) => results[it.key] && results[it.key].at !== now).length,
+    rows: [],
+  };
   for (const { row, items } of rowItems) {
     const r = { id: row.id, name: row.name, type: row.type, total: items.length, ja: 0, nein: [], offen: [], ohneImdb: [] };
     for (const it of items) {
@@ -504,12 +510,11 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       metas.push(meta);
       if (!inAll.has(id) && allByType[it.type]) { inAll.add(id); keyById[id] = it.key; allByType[it.type].push(meta); }
     }
-    await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
-    // Pro Genre eine gefilterte Fassung derselben Reihe
+    // Seitenweise (je 100), dazu pro Genre eine gefilterte Fassung derselben Reihe
+    const dir = join(OUT, code, "catalog", row.type);
+    await writePaged(dir, `${row.id}-${code}`, "", metas);
     const groups = groupByGenre(metas);
-    for (const [genre, list] of groups) {
-      await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}`, genreFileName(genre)), { metas: list });
-    }
+    for (const [genre, list] of groups) await writePaged(dir, `${row.id}-${code}`, `genre=${genre}`, list);
     genresByRow[row.id] = [...groups.keys()];
   }
   for (const it of poolItems) {
