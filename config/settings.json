@@ -205,7 +205,7 @@
         "maxDays": 90
       }
     ],
-    "positiveNewDays": 45,
+    "positiveNewDays": 5,
     "positiveOldDays": 90,
     "positiveGermanOriginalDays": 180
   }
