@@ -208,5 +208,9 @@
     "positiveNewDays": 45,
     "positiveOldDays": 90,
     "positiveGermanOriginalDays": 180
-  }
+  },
+  "debugIds": [
+    "tt1751634:1:1",
+    "tt1751634:2:1"
+  ]
 }
