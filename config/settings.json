@@ -25,11 +25,7 @@
     "maxChecksPerRun": 55,
     "maxChecksFirstRun": 95,
     "delayMs": 1500,
-    "onlyCached": true,
-    "recheckPositiveDays": 45,
-    "recheckNegativeHours": 48,
-    "recheckNegativeOldDays": 7,
-    "oldTitleDays": 365
+    "onlyCached": true
   },
   "rows": [
     {
@@ -189,5 +185,33 @@
     "series": 1000,
     "sort": "vote_count.desc",
     "refreshHours": 168
+  },
+  "recheck": {
+    "_info": "Nachprüf-Abstände. Ohne Deutsch: erste Nachprüfung nach firstDays, danach jeweils doppelt so lang bis maxDays. Stufe nach Alter des Titels (Erscheinungsdatum).",
+    "negative": [
+      {
+        "maxAgeDays": 90,
+        "firstDays": 2,
+        "maxDays": 7
+      },
+      {
+        "maxAgeDays": 365,
+        "firstDays": 7,
+        "maxDays": 21
+      },
+      {
+        "maxAgeDays": 1095,
+        "firstDays": 14,
+        "maxDays": 60
+      },
+      {
+        "maxAgeDays": 1000000,
+        "firstDays": 30,
+        "maxDays": 90
+      }
+    ],
+    "positiveNewDays": 45,
+    "positiveOldDays": 90,
+    "positiveGermanOriginalDays": 180
   }
 }

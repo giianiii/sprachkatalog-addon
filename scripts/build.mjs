@@ -83,6 +83,7 @@ async function fetchRow(row, lang) {
         poster: r.poster_path ? `https://image.tmdb.org/t/p/w342${r.poster_path}` : undefined,
         description: r.overview || undefined,
         releaseDate: r.release_date || r.first_air_date || "",
+        origLang: r.original_language,
       });
     }
     if (page >= (data.total_pages || 1)) break;
@@ -116,7 +117,7 @@ async function fetchPool(type, count, lang) {
     for (const r of data.results || []) {
       const date = r.release_date || r.first_air_date || "";
       items.push({
-        key: `${type}:${r.id}`, tmdbId: r.id, type, pool: true,
+        key: `${type}:${r.id}`, tmdbId: r.id, type, pool: true, origLang: r.original_language,
         name: r.title || r.name,
         poster: r.poster_path ? `https://image.tmdb.org/t/p/w342${r.poster_path}` : undefined,
         description: r.overview || undefined,
@@ -203,6 +204,7 @@ async function fetchRowAiom(row, state) {
       items.push({
         // Rating-Poster nur übernehmen, wenn der Link nichts Geheimes enthält (siehe safePoster)
         key, tmdbId, type: row.type, name: m.name, poster: safePoster(m.poster, AIOM_URL),
+        origLang: typeof m._originalLanguage === "string" ? m._originalLanguage : undefined,
         description: m.description || undefined,
         // Anzeige-Infos wie in deinen normalen Reihen (Jahr, Genres, Bewertung, Hintergrund, Logo)
         extra: pickExtra(m),
@@ -300,7 +302,11 @@ async function latestSeason(item, imdbId, state) {
 async function checkTitle(item, imdbId, lang, state, budget) {
   if (item.type !== "series") return { ok: await checkStream("movie", imdbId, lang), used: 1 };
   const latest = await latestSeason(item, imdbId, state);
-  const candidates = [...new Set([`${imdbId}:${latest}:1`, `${imdbId}:1:1`])];
+  // Nachprüfung eines Titels ohne Deutsch: nur die neueste Staffel (dort kommen neue Synchros zuerst)
+  const prev = state.results?.[lang.code]?.[item.key];
+  const candidates = prev && !prev.ok
+    ? [`${imdbId}:${latest}:1`]
+    : [...new Set([`${imdbId}:${latest}:1`, `${imdbId}:1:1`])];
   let used = 0;
   for (const id of candidates) {
     if (used >= budget) return { ok: false, used, incomplete: true };
@@ -328,13 +334,21 @@ async function loadState() {
 }
 
 function isDue(result, item) {
-  if (!result) return true;
-  const c = settings.check;
-  const age = now - result.at;
-  if (result.ok) return age > c.recheckPositiveDays * DAY;
+  return !result || now - result.at > recheckAfter(result, item);
+}
+
+// Nachprüf-Abstand nach Alter des Titels und Vorgeschichte (siehe config/settings.json → recheck)
+function recheckAfter(result, item) {
+  const r = settings.recheck;
   const released = Date.parse(item.releaseDate);
-  const isOld = Number.isFinite(released) && now - released > c.oldTitleDays * DAY;
-  return age > (isOld ? c.recheckNegativeOldDays * DAY : c.recheckNegativeHours * HOUR);
+  const ageDays = Number.isFinite(released) ? (now - released) / DAY : 0; // ohne Datum: wie neu behandeln
+  if (result.ok) {
+    if (result.origDe) return r.positiveGermanOriginalDays * DAY;
+    return (ageDays > 365 ? r.positiveOldDays : r.positiveNewDays) * DAY;
+  }
+  const step = r.negative.find((s) => ageDays < s.maxAgeDays) || r.negative[r.negative.length - 1];
+  const misses = Math.max(result.misses || 1, 1);
+  return Math.min(step.firstDays * 2 ** (misses - 1), step.maxDays) * DAY;
 }
 
 // ---------- Ausgabe ----------
@@ -418,6 +432,7 @@ const summary = [];
 
 for (const [code, lang] of Object.entries(settings.languages)) {
   if (!lang.active) continue;
+  lang.code = code;
   state.results[code] ||= {};
   const results = state.results[code];
 
@@ -452,7 +467,8 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     try {
       const { ok, used, incomplete } = await checkTitle(it, imdbId, lang, state, checksLeft);
       if (incomplete) { checksLeft -= used; break; } // Kontingent erschöpft: nicht als „kein Deutsch“ werten
-      results[it.key] = { ok, at: now };
+      const prev = results[it.key];
+      results[it.key] = { ok, at: now, ...(ok ? {} : { misses: (prev && !prev.ok ? prev.misses || 1 : 0) + 1 }), ...(ok && it.origLang === lang.code ? { origDe: true } : {}) };
       checked++; checksLeft -= used; failuresInRow = 0;
       if (ok) found++;
     } catch (e) {
