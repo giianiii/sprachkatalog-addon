@@ -90,6 +90,69 @@ async function fetchRow(row, lang) {
   return items;
 }
 
+// ---------- Bestand (Pool): bekannteste Titel von TMDB, nur für „Alle – <Sprache>“ ----------
+const genreNames = {};
+async function tmdbGenres(kind, lang) {
+  const k = `${kind}:${lang.tmdbLanguage}`;
+  if (!genreNames[k]) {
+    const data = await tmdb(`/genre/${kind}/list`, { language: lang.tmdbLanguage });
+    genreNames[k] = Object.fromEntries((data.genres || []).map((g) => [g.id, g.name]));
+  }
+  return genreNames[k];
+}
+
+async function fetchPool(type, count, lang) {
+  const kind = type === "movie" ? "movie" : "tv";
+  const names = await tmdbGenres(kind, lang);
+  const items = [];
+  const pages = Math.min(Math.ceil(count / 20), 500);
+  for (let page = 1; page <= pages; page++) {
+    const data = await tmdb(`/discover/${kind}`, {
+      language: lang.tmdbLanguage,
+      sort_by: settings.pool.sort || "vote_count.desc",
+      include_adult: false,
+      page,
+    });
+    for (const r of data.results || []) {
+      const date = r.release_date || r.first_air_date || "";
+      items.push({
+        key: `${type}:${r.id}`, tmdbId: r.id, type, pool: true,
+        name: r.title || r.name,
+        poster: r.poster_path ? `https://image.tmdb.org/t/p/w342${r.poster_path}` : undefined,
+        description: r.overview || undefined,
+        releaseDate: date,
+        extra: {
+          ...(date ? { year: date.slice(0, 4), releaseInfo: date.slice(0, 4) } : {}),
+          ...(r.vote_average ? { imdbRating: r.vote_average.toFixed(1) } : {}),
+          genres: (r.genre_ids || []).map((id) => names[id]).filter(Boolean).slice(0, 6),
+        },
+      });
+    }
+    if (page >= (data.total_pages || 1)) break;
+    await sleep(60);
+  }
+  return items.slice(0, count);
+}
+
+// Bestand nur alle paar Tage neu holen (ändert sich kaum)
+async function getPool(lang, state) {
+  if (!settings.pool?.active) return [];
+  state.pool ||= {};
+  const cached = state.pool[lang.tmdbLanguage];
+  if (cached && now - cached.at < (settings.pool.refreshHours || 168) * HOUR) return cached.items;
+  try {
+    const items = [
+      ...(await fetchPool("movie", settings.pool.movie || 0, lang)),
+      ...(await fetchPool("series", settings.pool.series || 0, lang)),
+    ];
+    state.pool[lang.tmdbLanguage] = { at: now, items };
+    return items;
+  } catch (e) {
+    log(`Bestand nicht geladen: ${e.message}`);
+    return cached?.items || [];
+  }
+}
+
 // ---------- AIOMetadata (deine eigenen Reihen) ----------
 let aiomCatalogs = null;
 async function aiomManifest() {
@@ -285,10 +348,20 @@ const ALL_ROWS = [
   { id: "all-series", type: "series", name: "Alle" },
 ];
 
+// Seitenweise ausgeben, wie die Apps beim Scrollen nachfragen: …/genre=X&skip=100.json
+const PAGE = 100;
+async function writePaged(dir, catalogId, extra, metas) {
+  for (let skip = 0; skip === 0 || skip < metas.length; skip += PAGE) {
+    const page = { metas: metas.slice(skip, skip + PAGE) };
+    const parts = [extra, skip ? `skip=${skip}` : ""].filter(Boolean).join("&");
+    await writeJson(parts ? join(dir, catalogId, `${parts}.json`) : join(dir, `${catalogId}.json`), page);
+  }
+}
+
 function manifestFor(code, lang, rows, genresByRow = {}) {
   return {
     id: `community.sprachkatalog.${code}`,
-    version: "1.2.0",
+    version: "1.3.0",
     name: `Sprachkatalog ${lang.label}`,
     description: `Bekannte Reihen, aber nur Titel, für die eine Fassung auf ${lang.label} verfügbar ist.`,
     resources: ["catalog"],
@@ -300,7 +373,7 @@ function manifestFor(code, lang, rows, genresByRow = {}) {
       name: `${r.name}${lang.suffix}`,
       // Genre-Auswahl in Nuvio/Stremio (nur Genres, die in dieser Reihe vorkommen)
       ...(genresByRow[r.id]?.length
-        ? { extra: [{ name: "genre", options: genresByRow[r.id], isRequired: false }] }
+        ? { extra: [{ name: "genre", options: genresByRow[r.id], isRequired: false }, ...(r.id.startsWith("all-") ? [{ name: "skip" }] : [])] }
         : {}),
     })),
     behaviorHints: { configurable: false, configurationRequired: false },
@@ -355,15 +428,19 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     log(`Reihe ${row.name} (${row.type}): ${items.length} Titel`);
   }
 
-  // 2) Prüfreihenfolge: zuerst nie geprüfte Titel, dann fällige Wiederholungen
+  const poolItems = await getPool(lang, state);
+  if (poolItems.length) log(`Bestand: ${poolItems.length} Titel`);
+
+  // 2) Prüfreihenfolge: Reihen vor Bestand, jeweils zuerst nie geprüfte Titel, dann fällige Wiederholungen
   const seen = new Set();
   const queue = [];
-  for (const { items } of rowItems) for (const it of items) {
+  for (const it of [...rowItems.flatMap((r) => r.items), ...poolItems]) {
     if (seen.has(it.key)) continue;
     seen.add(it.key);
     if (isDue(results[it.key], it)) queue.push(it);
   }
-  queue.sort((a, b) => (results[a.key] ? 1 : 0) - (results[b.key] ? 1 : 0));
+  const rank = (it) => (it.pool ? 2 : 0) + (results[it.key] ? 1 : 0);
+  queue.sort((a, b) => rank(a) - rank(b));
 
   // 3) Prüfen (begrenzt pro Lauf, Rest folgt in den nächsten Läufen)
   let checked = 0, found = 0;
@@ -403,6 +480,11 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     }
     status.rows.push(r);
   }
+  if (poolItems.length) {
+    const r = { id: "pool", name: "Bestand", type: "mixed", total: poolItems.length, ja: 0, nein: 0, offen: 0 };
+    for (const it of poolItems) { const res = results[it.key]; if (!res) r.offen++; else if (res.ok) r.ja++; else r.nein++; }
+    status.rows.push(r);
+  }
   await writeJson(join(OUT, `status-${code}.json`), status);
 
   // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
@@ -430,6 +512,13 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     }
     genresByRow[row.id] = [...groups.keys()];
   }
+  for (const it of poolItems) {
+    const id = state.imdb[it.key];
+    if (!id || inAll.has(id) || !results[it.key]?.ok || !allByType[it.type]) continue;
+    inAll.add(id); keyById[id] = it.key;
+    allByType[it.type].push({ id, type: it.type, name: it.name, poster: it.poster || `https://images.metahub.space/poster/medium/${id}/img`, description: it.description, ...(it.extra || {}) });
+  }
+
   // Archiv: einmal bestätigte Titel bleiben in „Alle“, auch wenn sie aus den Reihen fallen.
   // Fällt eine spätere Prüfung negativ aus, fliegen sie wieder raus.
   state.archive ||= {};
@@ -448,11 +537,10 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   // Sammelreihen: alles in einer Datei (die Apps fragen danach mit skip nach, bekommen 404 und hören auf)
   for (const row of ALL_ROWS) {
     const metas = allByType[row.type];
-    await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
+    const dir = join(OUT, code, "catalog", row.type);
+    await writePaged(dir, `${row.id}-${code}`, "", metas);
     const groups = groupByGenre(metas);
-    for (const [genre, list] of groups) {
-      await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}`, genreFileName(genre)), { metas: list });
-    }
+    for (const [genre, list] of groups) await writePaged(dir, `${row.id}-${code}`, `genre=${genre}`, list);
     genresByRow[row.id] = [...groups.keys()];
   }
   await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, [...settings.rows, ...ALL_ROWS], genresByRow));
