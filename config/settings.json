@@ -190,14 +190,9 @@
     "_info": "Nachprüf-Abstände. Ohne Deutsch: erste Nachprüfung nach firstDays, danach jeweils doppelt so lang bis maxDays. Stufe nach Alter des Titels (Erscheinungsdatum).",
     "negative": [
       {
-        "maxAgeDays": 90,
+        "maxAgeDays": 365,
         "firstDays": 2,
         "maxDays": 4
-      },
-      {
-        "maxAgeDays": 365,
-        "firstDays": 3,
-        "maxDays": 7
       },
       {
         "maxAgeDays": 730,
