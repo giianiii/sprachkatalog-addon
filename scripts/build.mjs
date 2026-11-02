@@ -279,10 +279,16 @@ async function writeJson(path, data) {
   await writeFile(path, JSON.stringify(data));
 }
 
+// Sammelreihen „Alle – <Sprache>“: alle bestätigten Titel aus allen Reihen, ohne Doppelte
+const ALL_ROWS = [
+  { id: "all-movie", type: "movie", name: "Alle" },
+  { id: "all-series", type: "series", name: "Alle" },
+];
+
 function manifestFor(code, lang, rows, genresByRow = {}) {
   return {
     id: `community.sprachkatalog.${code}`,
-    version: "1.1.0",
+    version: "1.2.0",
     name: `Sprachkatalog ${lang.label}`,
     description: `Bekannte Reihen, aber nur Titel, für die eine Fassung auf ${lang.label} verfügbar ist.`,
     resources: ["catalog"],
@@ -401,6 +407,8 @@ for (const [code, lang] of Object.entries(settings.languages)) {
 
   // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
   const genresByRow = {};
+  const allByType = { movie: [], series: [] };
+  const inAll = new Set();
   for (const { row, items } of rowItems) {
     const metas = [];
     const used = new Set();
@@ -409,7 +417,9 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       if (!id || used.has(id) || !results[it.key]?.ok) continue;
       used.add(id);
       const poster = it.poster || `https://images.metahub.space/poster/medium/${id}/img`;
-      metas.push({ id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) });
+      const meta = { id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) };
+      metas.push(meta);
+      if (!inAll.has(id) && allByType[it.type]) { inAll.add(id); allByType[it.type].push(meta); }
     }
     await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
     // Pro Genre eine gefilterte Fassung derselben Reihe
@@ -419,7 +429,17 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     }
     genresByRow[row.id] = [...groups.keys()];
   }
-  await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, settings.rows, genresByRow));
+  // Sammelreihen: alles in einer Datei (die Apps fragen danach mit skip nach, bekommen 404 und hören auf)
+  for (const row of ALL_ROWS) {
+    const metas = allByType[row.type];
+    await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}.json`), { metas });
+    const groups = groupByGenre(metas);
+    for (const [genre, list] of groups) {
+      await writeJson(join(OUT, code, "catalog", row.type, `${row.id}-${code}`, genreFileName(genre)), { metas: list });
+    }
+    genresByRow[row.id] = [...groups.keys()];
+  }
+  await writeJson(join(OUT, code, "manifest.json"), manifestFor(code, lang, [...settings.rows, ...ALL_ROWS], genresByRow));
 
   const pending = queue.length - checked;
   summary.push(`${lang.label}: ${checked} geprüft, ${found} mit ${lang.label}, ${Math.max(pending, 0)} noch offen`);
