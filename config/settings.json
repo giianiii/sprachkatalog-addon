@@ -181,12 +181,5 @@
   "pagesPerRow": 3,
   "_quelle": "Reihen kommen aus deinem AIOMetadata (Name der Reihe unter source.aiometadata). Ohne AIOMETADATA_URL wird auf TMDB (path/discover) zurückgegriffen.",
   "itemsPerRow": 60,
-  "rowRefreshHours": 6,
-  "debugIds": [
-    "tt0107120",
-    "tt2380307",
-    "tt3521164",
-    "tt0077651",
-    "tt15239678"
-  ]
+  "rowRefreshHours": 6
 }
