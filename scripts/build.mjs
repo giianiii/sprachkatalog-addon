@@ -358,6 +358,21 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   }
   if (failuresInRow >= 5) log("Abbruch nach 5 Fehlern in Folge, Rest beim nächsten Lauf.");
 
+  // Übersicht pro Reihe (öffentlich, enthält nur Titelnamen): status-<sprache>.json
+  const status = { updatedAt: new Date(now).toISOString(), rows: [] };
+  for (const { row, items } of rowItems) {
+    const r = { id: row.id, name: row.name, type: row.type, total: items.length, ja: 0, nein: [], offen: [], ohneImdb: [] };
+    for (const it of items) {
+      const res = results[it.key];
+      if (state.imdb[it.key] === null) r.ohneImdb.push(it.name);
+      else if (!res) r.offen.push(it.name);
+      else if (res.ok) r.ja++;
+      else r.nein.push(it.name);
+    }
+    status.rows.push(r);
+  }
+  await writeJson(join(OUT, `status-${code}.json`), status);
+
   // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
   const genresByRow = {};
   for (const { row, items } of rowItems) {
