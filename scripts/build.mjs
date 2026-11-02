@@ -527,6 +527,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   usage.proTagAktuell = Math.round(usage.proTagAktuell);
   usage.proTagVariante = Math.round(usage.proTagVariante);
   status.verbrauch = usage;
+  log(`Verbrauch: ${JSON.stringify(usage)} · neu offen ${status.neuOffen}, wartende Nachprüfungen ${status.wartendeNachpruefungen}`);
 
   if (poolItems.length) {
     const r = { id: "pool", name: "Bestand", type: "mixed", total: poolItems.length, ja: 0, nein: 0, offen: 0 };
