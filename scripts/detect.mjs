@@ -37,10 +37,13 @@ export function streamHasLanguage(stream, lang, { strict = true } = {}) {
 }
 
 // ElfHosted ersetzt bei erreichtem Limit die Liste durch einen einzelnen Hinweis-Eintrag.
-// Eindeutige Hinweise auf eine Tonspur im Dateinamen, z. B. „German.DL“, „Ger.Eng“, „GERMAN.AC3“
+// Geratene Sprache (⛿) aus dem Dateinamen: zählt, wenn die Sprache im Namen steht – ausser der Name
+// ist eine Sprach-Liste („English + French + German“, „Eng, Ger, Fra“) oder meint nur Untertitel.
+const LIST_LIKE = / \+ |\b[a-z]{2,10}\s*,\s*[a-z]{2,10}\s*,|\bmulti[ ._-]?subs?\b/i;
 function strongFilename(name, lang) {
-  if (!lang.strongPattern || / \+ /.test(name)) return false;
-  return new RegExp(lang.strongPattern, "i").test(name);
+  if (!name || LIST_LIKE.test(name) || !lang.filenamePattern) return false;
+  const withoutSubs = name.replace(/(german|ger|deutsch|italian|ita)[ ._-]*(subs?|subbed|subtitles?)/gi, "");
+  return new RegExp(lang.filenamePattern, "i").test(withoutSubs);
 }
 
 export function isRateLimited(streams) {
