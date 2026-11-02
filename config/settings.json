@@ -192,17 +192,17 @@
       {
         "maxAgeDays": 90,
         "firstDays": 2,
-        "maxDays": 7
+        "maxDays": 4
       },
       {
         "maxAgeDays": 365,
-        "firstDays": 7,
-        "maxDays": 21
+        "firstDays": 3,
+        "maxDays": 7
       },
       {
-        "maxAgeDays": 1095,
-        "firstDays": 14,
-        "maxDays": 60
+        "maxAgeDays": 730,
+        "firstDays": 7,
+        "maxDays": 21
       },
       {
         "maxAgeDays": 1000000,
