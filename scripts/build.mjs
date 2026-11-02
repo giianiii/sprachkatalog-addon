@@ -8,7 +8,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectLanguage, isRateLimited } from "./detect.mjs";
+import { detectLanguage, isRateLimited, isCached, streamHasLanguage } from "./detect.mjs";
 import { safePoster } from "./poster.mjs";
 import { groupByGenre, genreFileName } from "./genres.mjs";
 
@@ -301,7 +301,33 @@ function manifestFor(code, lang, rows, genresByRow = {}) {
   };
 }
 
+// ---------- Fehlersuche (nur wenn in settings.json "debugIds" gesetzt) ----------
+// Gibt pro Titel nur Anzeige-Infos aus: Anzahl Streams, ⚡ ja/nein, Tonspur-Zeile, Sprachtreffer.
+// Keine Links, keine Dateinamen (die Logs sind öffentlich).
+async function debugStreams(ids, lang) {
+  for (const id of ids) {
+    const type = id.includes(":") ? "series" : "movie";
+    try {
+      const res = await fetch(`${AIO_BASE}stream/${type}/${encodeURIComponent(id)}.json`);
+      const streams = res.ok ? (await res.json()).streams || [] : [];
+      log(`DEBUG ${id}: HTTP ${res.status}, ${streams.length} Streams, ${streams.filter(isCached).length} gecacht, Ergebnis ${detectLanguage(streams, lang, { onlyCached: true })}`);
+      for (const st of streams.slice(0, 12)) {
+        const desc = (st.description || st.title || "").split("\n");
+        const audio = desc.find((l) => l.includes("🔊")) || "(keine 🔊-Zeile)";
+        const nameLine = (st.name || "").split("\n").join(" | ").slice(0, 60);
+        log(`  ${isCached(st) ? "⚡" : "·"} ${streamHasLanguage(st, lang) ? "DE" : "--"} [${nameLine}] ${audio.slice(0, 80)} (Zeilen: ${desc.length})`);
+      }
+    } catch (e) {
+      log(`DEBUG ${id}: Fehler ${e.message}`);
+    }
+    await sleep(1500);
+  }
+}
+
 // ---------- Ablauf ----------
+if (Array.isArray(settings.debugIds) && settings.debugIds.length) {
+  await debugStreams(settings.debugIds.slice(0, 6), settings.languages.de);
+}
 const state = await loadState();
 // Erstinstallation: volles Kontingent nutzen (bei vollem Vorrat 100 Abfragen)
 const CHECK_ALL = process.env.CHECK_ALL === "true";
