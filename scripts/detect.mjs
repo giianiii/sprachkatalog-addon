@@ -20,7 +20,11 @@ export function streamHasLanguage(stream, lang) {
   const audioLine = description.split("\n").find((l) => l.includes("🔊"));
   if (audioLine) {
     const audioPart = audioLine.split(SUB_MARKER)[0];
-    if (audioPart.includes(lang.flag)) return true;
+    // ⛿ = Sprache nur aus dem Dateinamen geraten (unsicher). Dann nur zählen, wenn der Name
+    // eindeutig nach deutscher Tonspur aussieht – nicht bei Sammel-Listen wie „English + French + German“.
+    const guessed = audioPart.includes("⛿");
+    if (audioPart.includes(lang.flag) && (!guessed || strongFilename(filename || folder, lang))) return true;
+    if (guessed) return false;
   }
 
   if (lang.filenamePattern) {
@@ -33,6 +37,12 @@ export function streamHasLanguage(stream, lang) {
 }
 
 // ElfHosted ersetzt bei erreichtem Limit die Liste durch einen einzelnen Hinweis-Eintrag.
+// Eindeutige Hinweise auf eine Tonspur im Dateinamen, z. B. „German.DL“, „Ger.Eng“, „GERMAN.AC3“
+function strongFilename(name, lang) {
+  if (!lang.strongPattern || / \+ /.test(name)) return false;
+  return new RegExp(lang.strongPattern, "i").test(name);
+}
+
 export function isRateLimited(streams) {
   return streams.some((s) => /rate.?limit/i.test(`${s.name || ""} ${s.description || ""} ${s.title || ""}`));
 }

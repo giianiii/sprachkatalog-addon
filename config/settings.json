@@ -8,7 +8,8 @@
       "tmdbLanguage": "de-DE",
       "watchRegion": "CH",
       "flag": "🇩🇪",
-      "filenamePattern": "(^|[^a-z])(german|ger|deutsch)([^a-z]|$)"
+      "filenamePattern": "(^|[^a-z])(german|ger|deutsch)([^a-z]|$)",
+      "strongPattern": "(^|[^a-z])(german|ger)[ ._-]*(dl|ml|ac3|eac3|dd[p+]?|dts|truehd|aac|eng)([^a-z]|$)"
     },
     "it": {
       "active": false,
@@ -17,7 +18,8 @@
       "tmdbLanguage": "it-IT",
       "watchRegion": "IT",
       "flag": "🇮🇹",
-      "filenamePattern": "(^|[^a-z])(italian|ita|italiano)([^a-z]|$)"
+      "filenamePattern": "(^|[^a-z])(italian|ita|italiano)([^a-z]|$)",
+      "strongPattern": "(^|[^a-z])(italian|ita)[ ._-]*(dl|ml|ac3|eac3|dd[p+]?|dts|truehd|aac|eng)([^a-z]|$)"
     }
   },
   "check": {

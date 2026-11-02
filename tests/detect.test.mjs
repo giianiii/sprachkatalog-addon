@@ -53,3 +53,13 @@ test("Limit-Hinweis von ElfHosted wird erkannt", () => {
   assert.equal(isRateLimited([{ name: "🐢 AIOStreams", description: "public rate-limit exceeded" }]), true);
   assert.equal(isRateLimited([{ name: "1080P ⚡", description: "🔊 🇩🇪" }]), false);
 });
+
+test("⛿ (nur aus Dateinamen geraten): Sammel-Liste zählt nicht, „German DL“ schon", () => {
+  const de = { flag: "🇩🇪", filenamePattern: "(^|[^a-z])(german|ger|deutsch)([^a-z]|$)", strongPattern: "(^|[^a-z])(german|ger)[ ._-]*(dl|ml|ac3|eac3|dd[p+]?|dts|truehd|aac|eng)([^a-z]|$)" };
+  const qxr = { name: "4K ⚡", description: "🔊 ⛿ 🇩🇪 · 🇬🇧", behaviorHints: { filename: "Barbarian (2022) (2160p UHD BluRay x265 10bit DV HDR DTS-HD MA 5.1 English + French + German + Italian r00t) [QxR]" } };
+  const dl = { name: "1080p ⚡", description: "🔊 ⛿ 🇩🇪 · 🇬🇧", behaviorHints: { filename: "Film.2022.German.DL.1080p.BluRay.x264-GRP.mkv" } };
+  const checked = { name: "1080p ⚡", description: "🔊 ✓ 🇬🇧 · 🇩🇪", behaviorHints: { filename: "Film.2022.MULTi.1080p.mkv" } };
+  assert.equal(streamHasLanguage(qxr, de), false);
+  assert.equal(streamHasLanguage(dl, de), true);
+  assert.equal(streamHasLanguage(checked, de), true);
+});
