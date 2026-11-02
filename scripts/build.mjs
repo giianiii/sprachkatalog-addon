@@ -503,6 +503,31 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     }
     status.rows.push(r);
   }
+  // Verbrauchsrechnung: geprüfte Titel nach Alter, und was die Nachprüfungen pro Tag kosten
+  // (bei aktuellen Einstellungen und bei „bis 1 Jahr alle 2–4 Tage“)
+  const buckets = { "<3 Monate": 90, "3–12 Monate": 365, "1–2 Jahre": 730, "älter/ohne Datum": Infinity };
+  const usage = { titel: {}, proTagAktuell: 0, proTagVariante: 0 };
+  const counted = new Set();
+  const variant = { ...settings.recheck, negative: [{ maxAgeDays: 365, firstDays: 2, maxDays: 4 }, ...settings.recheck.negative.filter((x) => x.maxAgeDays > 365)] };
+  for (const it of [...rowItems.flatMap((r) => r.items), ...poolItems]) {
+    const res = results[it.key];
+    if (!res || counted.has(it.key)) continue;
+    counted.add(it.key);
+    const released = Date.parse(it.releaseDate);
+    const age = Number.isFinite(released) ? (now - released) / DAY : Infinity;
+    const b = Object.keys(buckets).find((k) => age < buckets[k]) || "älter/ohne Datum";
+    usage.titel[b] ||= { mitDeutsch: 0, ohneDeutsch: 0 };
+    usage.titel[b][res.ok ? "mitDeutsch" : "ohneDeutsch"]++;
+    const cost = it.type === "series" && res.ok ? 1.2 : 1;
+    usage.proTagAktuell += cost * DAY / recheckAfter(res, it);
+    const saved = settings.recheck; settings.recheck = variant;
+    usage.proTagVariante += cost * DAY / recheckAfter(res, it);
+    settings.recheck = saved;
+  }
+  usage.proTagAktuell = Math.round(usage.proTagAktuell);
+  usage.proTagVariante = Math.round(usage.proTagVariante);
+  status.verbrauch = usage;
+
   if (poolItems.length) {
     const r = { id: "pool", name: "Bestand", type: "mixed", total: poolItems.length, ja: 0, nein: 0, offen: 0 };
     for (const it of poolItems) { const res = results[it.key]; if (!res) r.offen++; else if (res.ok) r.ja++; else r.nein++; }
