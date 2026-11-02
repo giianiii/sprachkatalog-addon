@@ -11,7 +11,7 @@
 const CYRILLIC = /[Ѐ-ӿ]/;
 const SUB_MARKER = /s[ᴜu][ʙb]\s*\(/i;
 
-export function streamHasLanguage(stream, lang) {
+export function streamHasLanguage(stream, lang, { strict = true } = {}) {
   const filename = stream.behaviorHints?.filename || "";
   const folder = stream.behaviorHints?.folderName || "";
   if (CYRILLIC.test(filename) || CYRILLIC.test(folder)) return false;
@@ -22,7 +22,7 @@ export function streamHasLanguage(stream, lang) {
     const audioPart = audioLine.split(SUB_MARKER)[0];
     // ⛿ = Sprache nur aus dem Dateinamen geraten (unsicher). Dann nur zählen, wenn der Name
     // eindeutig nach deutscher Tonspur aussieht – nicht bei Sammel-Listen wie „English + French + German“.
-    const guessed = audioPart.includes("⛿");
+    const guessed = strict && audioPart.includes("⛿");
     if (audioPart.includes(lang.flag) && (!guessed || strongFilename(filename || folder, lang))) return true;
     if (guessed) return false;
   }
@@ -53,4 +53,14 @@ export function isCached(stream) {
 
 export function detectLanguage(streams, lang, { onlyCached = true } = {}) {
   return streams.some((s) => (!onlyCached || isCached(s)) && streamHasLanguage(s, lang));
+}
+
+// Für die Auswertung: welcher Debrid-Dienst liefert die Zielsprache, und hätte die alte,
+// lockere Regel (geratenes ⛿ immer zählen) ein anderes Ergebnis ergeben?
+export function languageInfo(streams, lang, { onlyCached = true } = {}) {
+  const usable = streams.filter((s) => !onlyCached || isCached(s));
+  const hits = usable.filter((s) => streamHasLanguage(s, lang));
+  const services = [...new Set(hits.map((s) => /\[([A-Z]{2,3})\]/.exec(s.description || "")?.[1] || "?"))].sort();
+  const looseOk = usable.some((s) => streamHasLanguage(s, lang, { strict: false }));
+  return { ok: hits.length > 0, services, onlyByLooseRule: !hits.length && looseOk };
 }

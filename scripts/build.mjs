@@ -8,7 +8,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectLanguage, isRateLimited, isCached, streamHasLanguage } from "./detect.mjs";
+import { detectLanguage, isRateLimited, isCached, streamHasLanguage, languageInfo } from "./detect.mjs";
 import { safePoster } from "./poster.mjs";
 import { groupByGenre, genreFileName } from "./genres.mjs";
 
@@ -254,6 +254,7 @@ async function imdbIdFor(item, state) {
 }
 
 // ---------- AIOStreams ----------
+let lastInfo = null; // Auswertung der letzten Abfrage (Dienste, lockere Regel)
 async function checkStream(type, id, lang) {
   const url = `${AIO_BASE}stream/${type}/${encodeURIComponent(id)}.json`;
   const ctrl = new AbortController();
@@ -264,7 +265,8 @@ async function checkStream(type, id, lang) {
     if (!res.ok) throw new Error(`AIOStreams HTTP ${res.status}`);
     const data = await res.json();
     if (isRateLimited(data.streams || [])) throw new RateLimitError();
-    return detectLanguage(data.streams || [], lang, { onlyCached: settings.check.onlyCached });
+    lastInfo = languageInfo(data.streams || [], lang, { onlyCached: settings.check.onlyCached });
+    return lastInfo.ok;
   } catch (e) {
     if (e instanceof RateLimitError) throw e;
     throw new Error(e.name === "AbortError" ? "AIOStreams Zeitüberschreitung" : e.message);
@@ -468,7 +470,9 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       const { ok, used, incomplete } = await checkTitle(it, imdbId, lang, state, checksLeft);
       if (incomplete) { checksLeft -= used; break; } // Kontingent erschöpft: nicht als „kein Deutsch“ werten
       const prev = results[it.key];
-      results[it.key] = { ok, at: now, ...(ok ? {} : { misses: (prev && !prev.ok ? prev.misses || 1 : 0) + 1 }), ...(ok && it.origLang === lang.code ? { origDe: true } : {}) };
+      results[it.key] = { ok, at: now, ...(ok ? {} : { misses: (prev && !prev.ok ? prev.misses || 1 : 0) + 1 }), ...(ok && it.origLang === lang.code ? { origDe: true } : {}),
+        ...(lastInfo ? { svc: lastInfo.services, ...(lastInfo.onlyByLooseRule ? { loose: true } : {}) } : {}) };
+      lastInfo = null;
       checked++; checksLeft -= used; failuresInRow = 0;
       if (ok) found++;
     } catch (e) {
@@ -527,6 +531,18 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   usage.proTagAktuell = Math.round(usage.proTagAktuell);
   usage.proTagVariante = Math.round(usage.proTagVariante);
   status.verbrauch = usage;
+  // Welche Dienste liefern Deutsch? (nur Titel, die seit Einführung der Auswertung geprüft wurden)
+  const dienste = { erfasst: 0, nurTB: 0, nurRD: 0, beide: 0, andere: 0, nurDurchGeratenesDeutsch: 0 };
+  for (const res of Object.values(results)) {
+    if (!res.svc) continue;
+    dienste.erfasst++;
+    if (res.loose) dienste.nurDurchGeratenesDeutsch++;
+    if (!res.ok) continue;
+    const tb = res.svc.includes("TB"), rd = res.svc.includes("RD");
+    if (tb && rd) dienste.beide++; else if (tb) dienste.nurTB++; else if (rd) dienste.nurRD++; else dienste.andere++;
+  }
+  status.dienste = dienste;
+  log(`Dienste: ${JSON.stringify(dienste)}`);
   log(`Verbrauch: ${JSON.stringify(usage)} · neu offen ${status.neuOffen}, wartende Nachprüfungen ${status.wartendeNachpruefungen}`);
 
   if (poolItems.length) {
