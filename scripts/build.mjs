@@ -464,7 +464,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   }
   // Treffer von vor einem Regelwechsel zuerst: falsche Einträge sollen schnell aus den Listen verschwinden
   const stale = (it) => results[it.key]?.ok && Number.isFinite(POSITIVES_BEFORE) && results[it.key].at < POSITIVES_BEFORE;
-  const rank = (it) => (stale(it) ? -1 : 0) + (it.pool ? 2 : 0) + (results[it.key] ? 1 : 0);
+  const rank = (it) => stale(it) ? (it.pool ? -1 : -2) : (it.pool ? 2 : 0) + (results[it.key] ? 1 : 0);
   queue.sort((a, b) => rank(a) - rank(b));
 
   // 3) Prüfen (begrenzt pro Lauf, Rest folgt in den nächsten Läufen)
