@@ -38,6 +38,12 @@ Alles steht in `config/settings.json`: Reihen hinzufügen oder entfernen, Sprach
 aktivieren, Prüfintervalle. TMDB-Anbieter-IDs: Netflix 8, Disney+ 337, Apple TV+ 350,
 Prime Video 119, HBO Max 1899.
 
+## Auswertung
+
+*Actions → Auswertung (nur lesend) → Run workflow*: zeigt, welche Titel Deutsch nur über
+Real-Debrid haben, und prüft eine Stichprobe bekannter Titel ohne Deutsch (Cache- oder
+Quellen-Lücke, oder gar keine Synchro). Ändert weder Prüfstand noch Kataloge.
+
 ## Sicherheit
 
 - Schlüssel nur als GitHub Secrets; nie in Dateien, Logs oder Ausgaben.
