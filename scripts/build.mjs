@@ -335,8 +335,13 @@ async function loadState() {
   }
 }
 
+const POSITIVES_BEFORE = Date.parse(settings.recheck.positivesCheckedBefore || "");
+
 function isDue(result, item) {
-  return !result || now - result.at > recheckAfter(result, item);
+  if (!result) return true;
+  // Treffer aus der Zeit vor einem Regelwechsel sofort neu prüfen (siehe settings.json → recheck)
+  if (result.ok && Number.isFinite(POSITIVES_BEFORE) && result.at < POSITIVES_BEFORE) return true;
+  return now - result.at > recheckAfter(result, item);
 }
 
 // Nachprüf-Abstand nach Alter des Titels und Vorgeschichte (siehe config/settings.json → recheck)
