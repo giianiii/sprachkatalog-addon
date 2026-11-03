@@ -82,6 +82,30 @@ for (const [r, list] of Object.entries(rdByRow).sort((a, b) => b[1].length - a[1
   say(`- ${r}: ${list.length} – ${list.slice(0, 12).join(", ")}${list.length > 12 ? " …" : ""}`);
 }
 
+// ---------- Diagnose: komplette Stream-Liste für einige bekannte Titel ----------
+// Zeigt, welche Quellen SELection nutzt, wie viele Ergebnisse kommen und welche Sprachen angezeigt werden.
+// Gibt nur Name, Beschreibung und Dateiname aus – nie die Abspiel-Links (enthalten Zugangsdaten).
+const DIAG = (process.env.DIAG || "").split(",").map((x) => x.trim()).filter((x) => /^tt\d+(:\d+:\d+)?$/.test(x)).slice(0, 8);
+async function diagnose() {
+  if (!DIAG.length) return;
+  say("## Diagnose: vollständige Stream-Listen");
+  for (const id of DIAG) {
+    const type = id.includes(":") ? "series" : "movie";
+    try {
+      const list = await streams(type, id);
+      say("");
+      say(`### ${id} – ${list.length} Streams`);
+      for (const s of list) {
+        const desc = (s.description || s.title || "").replace(/\n+/g, " ⏐ ").slice(0, 400);
+        const file = (s.behaviorHints?.filename || "").slice(0, 160);
+        say(`- **${(s.name || "").replace(/\n+/g, " ")}** ⏐ ${desc}${file ? ` ⏐ 📄 ${file}` : ""}`);
+      }
+    } catch (e) { say(`### ${id}: ${e.message}`); }
+    await sleep(settings.check.delayMs);
+  }
+  say("");
+}
+
 // ---------- Teil B: Stichprobe ----------
 say("");
 say(`## B) Stichprobe: ${SAMPLE} bekannte Titel ohne gefundenes Deutsch (Originalsprache ${LANGS.join("/")})`);
@@ -90,19 +114,29 @@ const candidates = [];
 for (const [key, res] of Object.entries(results)) {
   if (res.ok) continue;
   const it = items.get(key);
-  if (!it?.tmdbId) continue;
+  if (!it) continue;
   const released = Date.parse(it.releaseDate);
-  if (!Number.isFinite(released) || now - released < 60 * DAY) continue; // ganz neue Titel: Synchro oft noch unterwegs
+  // ganz neue Titel: Synchro oft noch unterwegs
+  if (Number.isFinite(released) && now - released < 60 * DAY) continue;
   if (it.origLang && !LANGS.includes(it.origLang)) continue;
-  candidates.push(it);
+  candidates.push({ ...it, imdb: state.imdb?.[key] || (/tt\d+$/.exec(key) || [])[0] });
 }
-// TMDB-Details: Sprache, Bekanntheit, offizielle deutsche Veröffentlichung
+// TMDB-Details: Sprache, Bekanntheit, offizielle deutsche Veröffentlichung.
+// Titel aus AIOMetadata haben oft nur eine IMDb-ID → TMDB-ID über /find nachschlagen.
 const detailed = [];
-for (const it of candidates.slice(0, 1000)) {
+for (const it of candidates.slice(0, 1500)) {
   const kind = it.type === "movie" ? "movie" : "tv";
   try {
-    const d = await tmdb(`/${kind}/${it.tmdbId}`, { append_to_response: `watch/providers,external_ids${kind === "movie" ? ",release_dates" : ""}` });
+    let tmdbId = it.tmdbId;
+    if (!tmdbId && it.imdb) {
+      const f = await tmdb(`/find/${it.imdb}`, { external_source: "imdb_id" });
+      tmdbId = (kind === "movie" ? f.movie_results : f.tv_results)?.[0]?.id;
+    }
+    if (!tmdbId) continue;
+    const d = await tmdb(`/${kind}/${tmdbId}`, { append_to_response: `watch/providers,external_ids${kind === "movie" ? ",release_dates" : ""}` });
+    const date = Date.parse(d.release_date || d.first_air_date || "");
     if (!LANGS.includes(d.original_language) || (d.vote_count || 0) < 300) continue;
+    if (Number.isFinite(date) && now - date < 60 * DAY) continue;
     detailed.push({ it, d });
   } catch (e) { console.log(`TMDB ${it.name}: ${e.message}`); }
   await sleep(30);
@@ -152,6 +186,8 @@ async function streams(type, id) {
   }
   throw new Error("AIOStreams-Limit");
 }
+
+await diagnose();
 
 const groups = { nunGecacht: [], nurUngecacht: [], offiziellAberKeineQuelle: [], keineOffizielleFassung: [], fehler: [] };
 for (const { it, d } of sample) {

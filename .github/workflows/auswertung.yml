@@ -8,6 +8,9 @@ on:
       stichprobe:
         description: "Anzahl Titel in der Stichprobe (max. 60)"
         default: "50"
+      diagnose:
+        description: "IMDb-IDs für vollständige Stream-Listen, mit Komma getrennt (Serie: tt…:Staffel:Folge)"
+        default: ""
 
 permissions:
   contents: read
@@ -32,4 +35,5 @@ jobs:
           AIOSTREAMS_URL: ${{ secrets.AIOSTREAMS_URL }}
           PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
           SAMPLE: ${{ inputs.stichprobe }}
+          DIAG: ${{ inputs.diagnose }}
         run: node scripts/auswertung.mjs
