@@ -12,7 +12,7 @@
 import { appendFile, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isCached, isRateLimited, streamHasLanguage } from "./detect.mjs";
+import { isCached, isInfoEntry, isRateLimited, streamHasLanguage } from "./detect.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const settings = JSON.parse(await readFile(join(ROOT, "config", "settings.json"), "utf8"));
@@ -96,6 +96,12 @@ async function diagnose() {
       say("");
       say(`### ${id} – ${list.length} Streams`);
       for (const s of list) {
+        // Statistik- und Fehler-Einträge von AIOStreams vollständig ausgeben (zeigen, was welche Quelle lieferte und was gefiltert wurde)
+        if (isInfoEntry(s)) {
+          say(`- **${(s.name || "").replace(/\n+/g, " ")}**`);
+          for (const line of (s.description || "").split("\n").slice(0, 60)) say(`    ${line.slice(0, 200)}`);
+          continue;
+        }
         const desc = (s.description || s.title || "").replace(/\n+/g, " ⏐ ").slice(0, 400);
         const file = (s.behaviorHints?.filename || "").slice(0, 160);
         say(`- **${(s.name || "").replace(/\n+/g, " ")}** ⏐ ${desc}${file ? ` ⏐ 📄 ${file}` : ""}`);

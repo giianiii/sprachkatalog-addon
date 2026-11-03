@@ -46,8 +46,15 @@ function strongFilename(name, lang) {
   return new RegExp(lang.filenamePattern, "i").test(withoutSubs);
 }
 
+// Fehlermeldungen einzelner Quellen („[❌] Comet …“) und Statistik-Einträge von AIOStreams
+// (🔍/🚫/🧩/⏱️/📅/📊) sind kein Limit der Instanz und dürfen den Lauf nicht abbrechen.
+const INFO_ENTRY = /^\s*(\[❌\]|🔍|🚫|🧩|⏱|📅|📊)/u;
+export function isInfoEntry(stream) {
+  return INFO_ENTRY.test(stream.name || "");
+}
+
 export function isRateLimited(streams) {
-  return streams.some((s) => /rate.?limit/i.test(`${s.name || ""} ${s.description || ""} ${s.title || ""}`));
+  return streams.some((s) => !isInfoEntry(s) && /rate.?limit/i.test(`${s.name || ""} ${s.description || ""} ${s.title || ""}`));
 }
 
 export function isCached(stream) {

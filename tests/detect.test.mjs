@@ -69,3 +69,8 @@ test("⛿ (nur aus Dateinamen geraten): Sammel-Liste zählt nicht, „German DL�
   assert.equal(streamHasLanguage(subs, de), false);
   assert.equal(streamHasLanguage(commas, de), false);
 });
+
+test("Fehler einer Quelle oder Statistik ist kein Instanz-Limit", () => {
+  assert.equal(isRateLimited([{ name: "[❌] Comet", description: "429: rate limit exceeded" }, { name: "1080P ⚡", description: "🔊 🇬🇧" }]), false);
+  assert.equal(isRateLimited([{ name: "🔍 Removal Reasons", description: "Rate limited addons: 0" }]), false);
+});
