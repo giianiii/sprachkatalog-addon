@@ -74,3 +74,29 @@ test("Fehler einer Quelle oder Statistik ist kein Instanz-Limit", () => {
   assert.equal(isRateLimited([{ name: "[❌] Comet", description: "429: rate limit exceeded" }, { name: "1080P ⚡", description: "🔊 🇬🇧" }]), false);
   assert.equal(isRateLimited([{ name: "🔍 Removal Reasons", description: "Rate limited addons: 0" }]), false);
 });
+
+import { seeders, isUsable, languageInfo } from "../scripts/detect.mjs";
+
+const unc = (seeds, file = "Twilight 2008 German DVDRip [720p] DiAMOND") => ({
+  name: "720P ⏳ 〈Dvdrip〉",
+  description: `✎ Twilight (2008) ⏐ 🔊 ✓ 🇩🇪 ⏐ ◈ 792 MB · 866 ᴷᵇᵖˢ⇄ ${seeds}❦ · 297d ⏐ ⛉ [TB] ComeTorz`,
+  behaviorHints: { filename: file },
+});
+
+test("Seeder-Zahl wird aus der Anzeige gelesen", () => {
+  assert.equal(seeders(unc(1239)), 1239);
+  assert.equal(seeders(unc("1.2k")), 1200);
+  assert.equal(seeders({ name: "1080P ⚡", description: "🔊 🇩🇪" }), 0);
+});
+
+test("Ungecacht zählt nur mit genug Seedern", () => {
+  const opts = { onlyCached: true, minSeeders: 20 };
+  assert.equal(isUsable(unc(1239), opts), true);
+  assert.equal(isUsable(unc(3), opts), false);
+  assert.equal(isUsable(unc(1239), { onlyCached: true, minSeeders: 0 }), false);
+  const info = languageInfo([unc(1239)], de, opts);
+  assert.equal(info.ok, true);
+  assert.equal(info.uncachedOnly, true);
+  assert.equal(info.seeds, 1239);
+  assert.equal(languageInfo([unc(3)], de, opts).ok, false);
+});

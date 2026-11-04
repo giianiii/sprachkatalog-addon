@@ -61,16 +61,39 @@ export function isCached(stream) {
   return (stream.name || "").includes("⚡");
 }
 
-export function detectLanguage(streams, lang, { onlyCached = true } = {}) {
-  return streams.some((s) => (!onlyCached || isCached(s)) && streamHasLanguage(s, lang));
+export function isUncached(stream) {
+  return (stream.name || "").includes("⏳");
+}
+
+// Seeder-Zahl ungecachter Streams: die Anzeige schreibt sie als „⇄ 1239❦“ (auch „⇄ 1.2k❦“)
+export function seeders(stream) {
+  const m = /⇄\s*([\d.,]+)\s*(k?)\s*❦/i.exec(stream.description || stream.title || "");
+  if (!m) return 0;
+  const n = m[2] ? parseFloat(m[1].replace(",", ".")) * 1000 : Number(m[1].replace(/[.,]/g, ""));
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+
+// Zählt ein Stream? Gecacht immer; ungecacht nur mit genug Seedern (lädt dann schnell nach)
+export function isUsable(stream, { onlyCached = true, minSeeders = 0 } = {}) {
+  if (!onlyCached || isCached(stream)) return true;
+  return minSeeders > 0 && isUncached(stream) && seeders(stream) >= minSeeders;
+}
+
+export function detectLanguage(streams, lang, opts = {}) {
+  return streams.some((s) => isUsable(s, opts) && streamHasLanguage(s, lang));
 }
 
 // Für die Auswertung: welcher Debrid-Dienst liefert die Zielsprache, und hätte die alte,
 // lockere Regel (geratenes ⛿ immer zählen) ein anderes Ergebnis ergeben?
-export function languageInfo(streams, lang, { onlyCached = true } = {}) {
-  const usable = streams.filter((s) => !onlyCached || isCached(s));
+// uncachedOnly: Zielsprache nur ungecacht (mit genug Seedern) vorhanden; seeds = beste Seeder-Zahl davon.
+export function languageInfo(streams, lang, opts = {}) {
+  const usable = streams.filter((s) => isUsable(s, opts));
   const hits = usable.filter((s) => streamHasLanguage(s, lang));
   const services = [...new Set(hits.map((s) => /\[([A-Z]{2,3})\]/.exec(s.description || "")?.[1] || "?"))].sort();
   const looseOk = usable.some((s) => streamHasLanguage(s, lang, { strict: false }));
-  return { ok: hits.length > 0, services, onlyByLooseRule: !hits.length && looseOk };
+  const uncachedOnly = hits.length > 0 && !hits.some(isCached);
+  return {
+    ok: hits.length > 0, services, onlyByLooseRule: !hits.length && looseOk,
+    uncachedOnly, seeds: uncachedOnly ? Math.max(...hits.map(seeders)) : undefined,
+  };
 }

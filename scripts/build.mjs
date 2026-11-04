@@ -265,7 +265,7 @@ async function checkStream(type, id, lang) {
     if (!res.ok) throw new Error(`AIOStreams HTTP ${res.status}`);
     const data = await res.json();
     if (isRateLimited(data.streams || [])) throw new RateLimitError();
-    lastInfo = languageInfo(data.streams || [], lang, { onlyCached: settings.check.onlyCached });
+    lastInfo = languageInfo(data.streams || [], lang, { onlyCached: settings.check.onlyCached, minSeeders: settings.check.minSeedersUncached || 0 });
     return lastInfo.ok;
   } catch (e) {
     if (e instanceof RateLimitError) throw e;
@@ -350,6 +350,8 @@ function recheckAfter(result, item) {
   const released = Date.parse(item.releaseDate);
   const ageDays = Number.isFinite(released) ? (now - released) / DAY : 0; // ohne Datum: wie neu behandeln
   if (result.ok) {
+    // Nur ungecacht (mit Seedern) gefunden: oft nachprüfen, damit Titel mit schwindenden Seedern rasch verschwinden
+    if (result.unc) return (r.positiveUncachedDays || 5) * DAY;
     if (result.origDe) return r.positiveGermanOriginalDays * DAY;
     return (ageDays > 365 ? r.positiveOldDays : r.positiveNewDays) * DAY;
   }
@@ -478,7 +480,8 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       if (incomplete) { checksLeft -= used; break; } // Kontingent erschöpft: nicht als „kein Deutsch“ werten
       const prev = results[it.key];
       results[it.key] = { ok, at: now, ...(ok ? {} : { misses: (prev && !prev.ok ? prev.misses || 1 : 0) + 1 }), ...(ok && it.origLang === lang.code ? { origDe: true } : {}),
-        ...(lastInfo ? { svc: lastInfo.services, ...(lastInfo.onlyByLooseRule ? { loose: true } : {}) } : {}) };
+        ...(lastInfo ? { svc: lastInfo.services, ...(lastInfo.onlyByLooseRule ? { loose: true } : {}),
+          ...(ok && lastInfo.uncachedOnly ? { unc: true, seed: lastInfo.seeds } : {}) } : {}) };
       lastInfo = null;
       checked++; checksLeft -= used; failuresInRow = 0;
       if (ok) found++;
@@ -539,12 +542,13 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   usage.proTagVariante = Math.round(usage.proTagVariante);
   status.verbrauch = usage;
   // Welche Dienste liefern Deutsch? (nur Titel, die seit Einführung der Auswertung geprüft wurden)
-  const dienste = { erfasst: 0, nurTB: 0, nurRD: 0, beide: 0, andere: 0, nurDurchGeratenesDeutsch: 0 };
+  const dienste = { erfasst: 0, nurTB: 0, nurRD: 0, beide: 0, andere: 0, nurDurchGeratenesDeutsch: 0, nurUngecachtMitSeedern: 0 };
   for (const res of Object.values(results)) {
     if (!res.svc) continue;
     dienste.erfasst++;
     if (res.loose) dienste.nurDurchGeratenesDeutsch++;
     if (!res.ok) continue;
+    if (res.unc) dienste.nurUngecachtMitSeedern++;
     const tb = res.svc.includes("TB"), rd = res.svc.includes("RD");
     if (tb && rd) dienste.beide++; else if (tb) dienste.nurTB++; else if (rd) dienste.nurRD++; else dienste.andere++;
   }

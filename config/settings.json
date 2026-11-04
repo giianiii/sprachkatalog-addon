@@ -25,7 +25,9 @@
     "maxChecksPerRun": 55,
     "maxChecksFirstRun": 95,
     "delayMs": 1500,
-    "onlyCached": true
+    "onlyCached": true,
+    "_ungecacht": "Ungecachte Streams in der Zielsprache zählen nur mit mindestens minSeedersUncached Seedern (laden nach dem Antippen rasch nach). 0 = nur gecachte zählen.",
+    "minSeedersUncached": 20
   },
   "rows": [
     {
@@ -209,6 +211,7 @@
     "positiveOldDays": 30,
     "positiveGermanOriginalDays": 180,
     "_regelwechsel": "Nach einer Änderung der Erkennungsregel: Datum/Zeit hier eintragen (ISO, UTC). Alle Treffer mit Deutsch, die vorher geprüft wurden, gelten dann sofort als fällig und werden neu geprüft. Wird nur nach Absprache gesetzt.",
-    "positivesCheckedBefore": "2026-11-02T17:10:00Z"
+    "positivesCheckedBefore": "2026-11-02T17:10:00Z",
+    "positiveUncachedDays": 5
   }
 }
