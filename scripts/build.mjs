@@ -567,6 +567,12 @@ for (const [code, lang] of Object.entries(settings.languages)) {
   await writeJson(join(OUT, `status-${code}.json`), status);
 
   // 4) Kataloge schreiben: Originalreihenfolge, nur bestätigte Titel
+  // Hinweis für Titel, die nur ungecacht (mit Seedern) verfügbar sind; verschwindet, sobald gecacht
+  const UNC_HINT = `⏳ ${lang.label} nur ungecacht verfügbar – startet nach kurzer Ladezeit.`;
+  const withHint = (meta, res) => {
+    const base = (meta.description || "").replace(/^⏳[^\n]*\n*/, "");
+    return { ...meta, description: res?.unc ? (base ? `${UNC_HINT}\n\n${base}` : UNC_HINT) : base || undefined };
+  };
   const genresByRow = {};
   const allByType = { movie: [], series: [] };
   const inAll = new Set();
@@ -579,7 +585,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
       if (!id || used.has(id) || !results[it.key]?.ok) continue;
       used.add(id);
       const poster = it.poster || `https://images.metahub.space/poster/medium/${id}/img`;
-      const meta = { id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) };
+      const meta = withHint({ id, type: it.type, name: it.name, poster, description: it.description, ...(it.extra || {}) }, results[it.key]);
       metas.push(meta);
       if (!inAll.has(id) && allByType[it.type]) { inAll.add(id); keyById[id] = it.key; allByType[it.type].push(meta); }
     }
@@ -594,7 +600,7 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     const id = state.imdb[it.key];
     if (!id || inAll.has(id) || !results[it.key]?.ok || !allByType[it.type]) continue;
     inAll.add(id); keyById[id] = it.key;
-    allByType[it.type].push({ id, type: it.type, name: it.name, poster: it.poster || `https://images.metahub.space/poster/medium/${id}/img`, description: it.description, ...(it.extra || {}) });
+    allByType[it.type].push(withHint({ id, type: it.type, name: it.name, poster: it.poster || `https://images.metahub.space/poster/medium/${id}/img`, description: it.description, ...(it.extra || {}) }, results[it.key]));
   }
 
   // Archiv: einmal bestätigte Titel bleiben in „Alle“, auch wenn sie aus den Reihen fallen.
@@ -608,7 +614,9 @@ for (const [code, lang] of Object.entries(settings.languages)) {
     for (const meta of allByType[type]) archive[meta.id] = { key: keyById[meta.id], at: now, meta };
   }
   const archived = Object.values(archive).sort((a, b) => b.at - a.at);
-  for (const { meta } of archived) {
+  for (const entry of archived) {
+    const meta = withHint(entry.meta, results[entry.key]);
+    entry.meta = meta;
     if (!inAll.has(meta.id) && allByType[meta.type]) { inAll.add(meta.id); allByType[meta.type].push(meta); }
   }
 

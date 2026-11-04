@@ -12,7 +12,7 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
    Stream mit deutscher Tonspur existiert. Serien: zuerst Folge 1 der neuesten Staffel
    (am ehesten gecacht), sonst zusätzlich S01E01.
    Ungecachte Streams zählen nur mit mindestens 20 Seedern (`check.minSeedersUncached`); solche
-   Titel werden alle 5 Tage nachgeprüft und fallen raus, sobald die Seeder fehlen.
+   Titel werden alle 3 Tage nachgeprüft und tragen in der Beschreibung den Hinweis „⏳ … nur ungecacht“ und fallen raus, sobald die Seeder fehlen.
 3. Ergebnisse werden zwischengespeichert: bestätigte Titel werden alle 30 Tage erneut
    geprüft, Titel ohne deutsche Fassung täglich (ältere wöchentlich). Pro Lauf höchstens
    55 Prüfungen: Die öffentliche AIOStreams-Instanz erlaubt 100 Abfragen auf Vorrat und
