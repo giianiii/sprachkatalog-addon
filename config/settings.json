@@ -212,6 +212,8 @@
     "positiveGermanOriginalDays": 180,
     "_regelwechsel": "Nach einer Änderung der Erkennungsregel: Datum/Zeit hier eintragen (ISO, UTC). Alle Treffer mit Deutsch, die vorher geprüft wurden, gelten dann sofort als fällig und werden neu geprüft. Wird nur nach Absprache gesetzt.",
     "positivesCheckedBefore": "2026-11-02T17:10:00Z",
-    "positiveUncachedDays": 5
+    "positiveUncachedDays": 5,
+    "_hauptreihenNachpruefung": "Einmalige Nachprüfung: Titel der Hauptreihen (nicht Bestand), die vor diesem Zeitpunkt ohne Deutsch geprüft wurden, gelten sofort als fällig. Wird nur nach Absprache gesetzt.",
+    "rowNegativesCheckedBefore": "2026-11-04T12:12:00Z"
   }
 }

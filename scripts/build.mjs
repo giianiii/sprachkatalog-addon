@@ -336,9 +336,12 @@ async function loadState() {
 }
 
 const POSITIVES_BEFORE = Date.parse(settings.recheck.positivesCheckedBefore || "");
+const ROW_NEGATIVES_BEFORE = Date.parse(settings.recheck.rowNegativesCheckedBefore || "");
 
 function isDue(result, item) {
   if (!result) return true;
+  // Titel der Hauptreihen ohne Treffer aus der Zeit vor einer Regeländerung einmalig neu prüfen (siehe settings.json → recheck)
+  if (!result.ok && !item.pool && Number.isFinite(ROW_NEGATIVES_BEFORE) && result.at < ROW_NEGATIVES_BEFORE) return true;
   // Treffer aus der Zeit vor einem Regelwechsel sofort neu prüfen (siehe settings.json → recheck)
   if (result.ok && Number.isFinite(POSITIVES_BEFORE) && result.at < POSITIVES_BEFORE) return true;
   return now - result.at > recheckAfter(result, item);
