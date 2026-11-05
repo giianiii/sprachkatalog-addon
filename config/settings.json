@@ -178,7 +178,7 @@
   ],
   "pagesPerRow": 3,
   "_quelle": "Reihen kommen aus deinem AIOMetadata (Name der Reihe unter source.aiometadata). Ohne AIOMETADATA_URL wird auf TMDB (path/discover) zurückgegriffen.",
-  "itemsPerRow": 300,
+  "itemsPerRow": 500,
   "rowRefreshHours": 6,
   "pool": {
     "_info": "Bekannteste Titel von TMDB (nach Stimmenzahl), werden im Hintergrund geprüft und landen nur in „Alle – Deutsch“.",
