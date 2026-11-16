@@ -140,13 +140,15 @@ async function getPool(lang, state) {
   if (!settings.pool?.active) return [];
   state.pool ||= {};
   const cached = state.pool[lang.tmdbLanguage];
-  if (cached && now - cached.at < (settings.pool.refreshHours || 168) * HOUR) return cached.items;
+  // Neu laden, wenn die Grösse in settings.json geändert wurde (sonst erst nach refreshHours)
+  const sameSize = cached && cached.movie === (settings.pool.movie || 0) && cached.series === (settings.pool.series || 0);
+  if (cached && sameSize && now - cached.at < (settings.pool.refreshHours || 168) * HOUR) return cached.items;
   try {
     const items = [
       ...(await fetchPool("movie", settings.pool.movie || 0, lang)),
       ...(await fetchPool("series", settings.pool.series || 0, lang)),
     ];
-    state.pool[lang.tmdbLanguage] = { at: now, items };
+    state.pool[lang.tmdbLanguage] = { at: now, movie: settings.pool.movie || 0, series: settings.pool.series || 0, items };
     return items;
   } catch (e) {
     log(`Bestand nicht geladen: ${e.message}`);
@@ -193,6 +195,7 @@ async function fetchRowAiom(row, state) {
     if (!res.ok) throw new Error(`AIOMetadata HTTP ${res.status}`);
     const metas = (await res.json()).metas || [];
     if (!metas.length) break;
+    const before = items.length;
     for (const m of metas) {
       let key, tmdbId;
       const tmdbMatch = /^tmdb:(\d+)$/.exec(m.id || "");
@@ -211,6 +214,8 @@ async function fetchRowAiom(row, state) {
         releaseDate: m.released || ((m.year || m.releaseInfo) ? `${String(m.year || m.releaseInfo).slice(0, 4)}-01-01` : ""),
       });
     }
+    // Liefert AIOMetadata nichts Neues mehr (z. B. weil skip ignoriert wird), hier aufhören
+    if (items.length === before) break;
     if (metas.length < 10) break;
     await sleep(300);
   }
