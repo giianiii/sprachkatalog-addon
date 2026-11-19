@@ -12,7 +12,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const settings = JSON.parse(await readFile(join(ROOT, "config", "settings.json"), "utf8"));
 const AIO_URL = process.env.AIOSTREAMS_URL || "";
 const PAGES_URL = (process.env.PAGES_URL || "").replace(/\/+$/, "");
-const SAMPLE = Math.max(5, Math.min(Number(process.env.SAMPLE || 40), 60));
+const SAMPLE = Math.max(1, Math.min(Number(process.env.SAMPLE || 40), 60));
+const ONLY_EXTRA = process.env.ONLY_EXTRA === "true";
 const EXTRA = (process.env.EXTRA || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).slice(0, 10);
 const lang = { ...settings.languages.de, code: "de" };
 const opts = { onlyCached: settings.check.onlyCached, minSeeders: settings.check.minSeedersUncached || 0 };
@@ -43,9 +44,9 @@ const imdbOf = (it) => state.imdb?.[it.key] || (/tt\d+$/.exec(it.key) || [])[0];
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const chosen = new Map();
 for (const word of EXTRA) for (const it of positives) if ((it.name || "").toLowerCase().includes(word) && chosen.size < SAMPLE) chosen.set(it.key, { it, grund: `gesucht „${word}“` });
-const risk = shuffle(positives.filter((it) => RISK_LANGS.includes(it.origLang) && !chosen.has(it.key)));
+const risk = ONLY_EXTRA ? [] : shuffle(positives.filter((it) => RISK_LANGS.includes(it.origLang) && !chosen.has(it.key)));
 for (const it of risk.slice(0, Math.floor((SAMPLE - chosen.size) / 2))) chosen.set(it.key, { it, grund: `Original ${it.origLang}` });
-const rest = shuffle(positives.filter((it) => rowItems.has(it.key) && !chosen.has(it.key)));
+const rest = ONLY_EXTRA ? [] : shuffle(positives.filter((it) => rowItems.has(it.key) && !chosen.has(it.key)));
 for (const it of rest) { if (chosen.size >= SAMPLE) break; chosen.set(it.key, { it, grund: "Hauptreihe, zufällig" }); }
 
 say(`## Regeltest: neue Regel gegen „de“ im Titel`);
@@ -77,13 +78,23 @@ for (const { it, grund } of chosen.values()) {
   const label = `${it.name}${it.releaseDate ? ` (${String(it.releaseDate).slice(0, 4)})` : ""} · ${it.type === "movie" ? "Film" : "Serie"} · ${grund}`;
   if (!imdb) { g.fehler.push(`${label}: keine IMDb-ID`); continue; }
   const type = it.type === "series" ? "series" : "movie";
-  const id = type === "series" ? `${imdb}:${state.seasons?.[imdb]?.season || 1}:1` : imdb;
+  // wie der Katalog-Bau: Serien erst Folge 1 der neuesten Staffel, ohne Deutsch zusätzlich S01E01
+  const ids = type === "series" ? [...new Set([`${imdb}:${state.seasons?.[imdb]?.season || 1}:1`, `${imdb}:1:1`])] : [imdb];
   try {
-    const list = (await streams(type, id)).filter((s) => !isInfoEntry(s) && isUsable(s, opts));
-    const alt = list.filter((s) => streamHasLanguage(s, lang));
-    const neu = alt.filter((s) => streamHasLanguageNeu(s, lang));
+    let alt = [], neu = [], fehlerQuellen = [], geprueft = [];
+    for (const id of ids) {
+      const raw = await streams(type, id);
+      geprueft.push(id.replace(/^tt\d+:?/, "") || "Film");
+      fehlerQuellen.push(...raw.filter((s) => /^\s*\[❌\]/.test(s.name || "")).map((s) => (s.name || "").replace(/\s+/g, " ").slice(0, 60)));
+      const list = raw.filter((s) => !isInfoEntry(s) && isUsable(s, opts));
+      alt = list.filter((s) => streamHasLanguage(s, lang));
+      neu = alt.filter((s) => streamHasLanguageNeu(s, lang));
+      if (alt.length) break;
+      if (ids.length > 1) await sleep(settings.check.delayMs);
+    }
     const weg = alt.filter((s) => !neu.includes(s)).map((s) => `    📄 ${(s.behaviorHints?.filename || s.behaviorHints?.folderName || "(ohne Dateiname)").slice(0, 160)}`);
-    const zeile = `${label} – deutsche Streams heute ${alt.length}, neu ${neu.length}`;
+    const hinweis = `${type === "series" ? ` · geprüft ${geprueft.map((x) => "S" + x.replace(":", "E")).join(", ")}` : ""}${fehlerQuellen.length ? ` · Quellen-Fehler: ${[...new Set(fehlerQuellen)].join("; ")}` : ""}`;
+    const zeile = `${label} – deutsche Streams heute ${alt.length}, neu ${neu.length}${hinweis}`;
     if (!alt.length) g.heuteNichtMehr.push(zeile);
     else if (!neu.length) g.faellt.push([zeile, ...weg].join("\n"));
     else if (weg.length) g.bleibtWeniger.push([zeile, ...weg].join("\n"));
