@@ -100,3 +100,25 @@ test("Ungecacht zählt nur mit genug Seedern", () => {
   assert.equal(info.seeds, 1239);
   assert.equal(languageInfo([unc(3)], de, opts).ok, false);
 });
+
+import { onlyTitleDe } from "../scripts/detect.mjs";
+
+test("„de“ im spanischen/französischen Titel ist kein Deutsch", () => {
+  const s = {
+    name: "1080P ⚡",
+    description: "✎ Una Historia De Gori… (2026)\n🔊 ✓ 🇩🇪 · MULTI",
+    behaviorHints: { filename: "Una.Historia.De.Gorilas.Contada.Por.David.Attenborough.2026.1080P-Dual-Lat.mkv" },
+  };
+  assert.equal(streamHasLanguage(s, de), false);
+  assert.equal(onlyTitleDe("Les.figures.de.l.ombre.2016.MULTI.1080p.WEBRip.x264.AC3-SUNNY.mkv"), true);
+  assert.equal(onlyTitleDe("O.Homem.de.Branco.2022.1080p.WEB-DL.DUAL.2.0.mkv"), true);
+  assert.equal(onlyTitleDe("Un.jefe.en.pañales.2.negocios.de.familia.(2021).1080p.dual-lat-cinecalidad.link.mp4"), true);
+});
+
+test("echte deutsche Releases mit „de“ zählen weiter", () => {
+  assert.equal(onlyTitleDe("La.Casa.de.Papel.S01E01.German.DL.1080p.mkv"), false);
+  assert.equal(onlyTitleDe("Film.2026.MULTi.DE.EN.1080p.WEB-DL.mkv"), false);
+  assert.equal(onlyTitleDe("Gorilla.Story.2026.German.DL.1080p.WEB.x264.mkv"), false);
+  assert.equal(onlyTitleDe("Lo.Que.Queda.De.Ti.1080p.mkv"), false); // ohne Jahreszahl: wie bisher
+  assert.equal(onlyTitleDe("2001.A.Space.Odyssey.1968.MULTi.DE.1080p.mkv"), false);
+});

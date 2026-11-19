@@ -4,6 +4,8 @@
 //  - Zeile mit 🔊 listet Tonsprachen als Flaggen; danach folgen Untertitel als "sᴜʙ (…)".
 //    Flaggen nach "sᴜʙ" zählen nicht (nur Untertitel).
 //  - Gecachte Streams tragen ⚡ im Namen.
+// Ausserdem: Ein „de“ im Titel nicht-deutscher Releases („Una Historia De Gorilas 2026 Dual-Lat“)
+// liest AIOStreams als Deutsch; solche Streams zählen nicht (siehe onlyTitleDe).
 // Zusätzlich: Dateinamen mit kyrillischen Zeichen werden nie als Zielsprache gezählt
 // (russische Releases sind oft falsch als Deutsch markiert), und als Rückfall wird der
 // Dateiname auf typische Sprachkürzel geprüft.
@@ -11,7 +13,37 @@
 const CYRILLIC = /[Ѐ-ӿ]/;
 const SUB_MARKER = /s[ᴜu][ʙb]\s*\(/i;
 
-export function streamHasLanguage(stream, lang, { strict = true } = {}) {
+export function streamHasLanguage(stream, lang, opts = {}) {
+  if (!rawHasLanguage(stream, lang, opts)) return false;
+  if (lang.flag !== "🇩🇪") return true;
+  const names = [stream.behaviorHints?.filename, stream.behaviorHints?.folderName].filter(Boolean);
+  // zählt weiter, sobald einer der Namen nicht nur ein Titel-„de“ hat (ohne Namen: wie bisher)
+  return !names.length || !names.every(onlyTitleDe);
+}
+
+// Regel gegen „de“ im Titel (am 19.11.2026 an 40 Titeln getestet: nur Fehltreffer betroffen).
+// Ein Name zählt NICHT als deutsch, wenn
+//   1. nirgends German, GER, Deutsch oder DL steht (WEB-DL zählt nicht als DL),
+//   2. „de“ als eigenes Wort nur im Titelteil vorkommt (vor der Jahreszahl) und
+//   3. nach der Jahreszahl kein „DE“ mehr steht.
+// Ohne Jahreszahl bleibt alles wie bisher (im Zweifel zählen).
+const STRONG_DE = /(^|[^a-z])(german|ger|deutsch)([^a-z]|$)|(?<!web[ ._-]?)(^|[^a-z])dl([^a-z]|$)/i;
+const YEAR = /(?:^|[ ._\-([])((?:19|20)\d{2})(?=[ ._\-)\]]|$)/g;
+const DE_WORD = /(^|[ ._\-([])de(?=[ ._\-)\]]|$)/gi;
+export function onlyTitleDe(name) {
+  if (!name || STRONG_DE.test(name)) return false;
+  // erste Jahreszahl nach mindestens einem Titelwort (Titel wie „1917“ am Anfang überspringen)
+  let yearEnd = -1;
+  for (const m of name.matchAll(YEAR)) {
+    if (m.index > 0) { yearEnd = m.index + m[0].length; break; }
+  }
+  if (yearEnd < 0) return false;
+  const before = [...name.slice(0, yearEnd).matchAll(DE_WORD)].length;
+  const after = [...name.slice(yearEnd).matchAll(DE_WORD)].length;
+  return before > 0 && after === 0;
+}
+
+function rawHasLanguage(stream, lang, { strict = true } = {}) {
   const filename = stream.behaviorHints?.filename || "";
   const folder = stream.behaviorHints?.folderName || "";
   if (CYRILLIC.test(filename) || CYRILLIC.test(folder)) return false;

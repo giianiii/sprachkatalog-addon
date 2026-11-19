@@ -11,6 +11,8 @@ Fassung in der Zielsprache verfügbar ist**. Gestartet mit Deutsch, Struktur meh
 2. Für jeden Titel fragt er die eigene AIOStreams-Konfiguration ab, ob ein gecachter
    Stream mit deutscher Tonspur existiert. Serien: zuerst Folge 1 der neuesten Staffel
    (am ehesten gecacht), sonst zusätzlich S01E01.
+   Nicht gezählt werden Releases, deren 🇩🇪 nur von einem „de“ im Titel stammt (z. B. spanische
+   „Una Historia De … 2026 Dual-Lat“), sofern nirgends German/GER/Deutsch/DL steht.
    Ungecachte Streams zählen nur mit mindestens 20 Seedern (`check.minSeedersUncached`); solche
    Titel werden alle 3 Tage nachgeprüft und tragen in der Beschreibung den Hinweis „⏳ … nur ungecacht“ und fallen raus, sobald die Seeder fehlen.
 3. Ergebnisse werden zwischengespeichert: bestätigte Titel werden alle 30 Tage erneut
