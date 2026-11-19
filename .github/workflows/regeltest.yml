@@ -1,0 +1,39 @@
+name: Regeltest (nur lesend)
+
+# Manuell starten: Actions → Regeltest (nur lesend) → Run workflow.
+# Vergleicht die heutige Deutsch-Erkennung mit der neuen Regel gegen „de“ im Titel.
+# Ändert weder Prüfstand noch Kataloge; Ergebnis steht in der Zusammenfassung des Laufs.
+on:
+  workflow_dispatch:
+    inputs:
+      stichprobe:
+        description: "Anzahl Titel (max. 60)"
+        default: "40"
+      titel:
+        description: "Zusätzlich diese Titel prüfen (Namensteile, mit Komma getrennt)"
+        default: "gorilla, mummy, mumie"
+
+permissions:
+  contents: read
+
+# Gleiche Gruppe wie „Katalog bauen“: läuft nie gleichzeitig, damit sich die Abfragen nicht ins Gehege kommen
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  regeltest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Regeltest
+        env:
+          AIOSTREAMS_URL: ${{ secrets.AIOSTREAMS_URL }}
+          PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          SAMPLE: ${{ inputs.stichprobe }}
+          EXTRA: ${{ inputs.titel }}
+        run: node scripts/regeltest.mjs
